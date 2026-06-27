@@ -1,0 +1,361 @@
+// =====================================================================
+//  KYKLOS — Prisma Schema (NestJS backend)
+//  Pengganti kyklos_schema.sql (yang Supabase-specific).
+//
+//  Struktur logis SAMA dengan sebelumnya. Perubahan:
+//   - profiles + auth.users  ->  satu tabel `users` (dgn password_hash)
+//   - RLS dihapus dari DB     ->  pemisahan role pindah ke NestJS Guards
+//   - Saldo + ledger append-only tetap dijaga via TRIGGER DB
+//     (lihat kyklos_triggers.sql — jalankan setelah `prisma migrate`)
+//
+//  Urutan setup:  prisma migrate dev  ->  jalankan kyklos_triggers.sql  ->  prisma db seed
+//  Uang = BigInt (rupiah, bilangan bulat).
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------- ENUMS -----------------------------
+enum UserRole {
+  admin
+  member
+}
+
+enum MembershipStatus {
+  active
+  invited
+  inactive
+}
+
+enum PocketType {
+  treasury
+  arisan
+  dues
+  event
+}
+
+enum TxnDirection {
+  in
+  out
+}
+
+enum TxnStatus {
+  confirmed
+  pending
+}
+
+enum ContributionStatus {
+  unpaid
+  pending_verify
+  paid
+  late
+}
+
+enum ArisanStatus {
+  open
+  drawn
+  closed
+}
+
+enum RsvpStatus {
+  yes
+  no
+  maybe
+}
+
+enum PaymentMethod {
+  manual_transfer
+  gateway
+}
+
+enum PaymentProvider {
+  midtrans
+  xendit
+}
+
+// ----------------------------- MODELS -----------------------------
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String?
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  createdCommunities   Community[]         @relation("CommunityCreatedBy")
+  memberships          Membership[]
+  txnsAsActor          Transaction[]       @relation("TxnActor")
+  txnsCreated          Transaction[]       @relation("TxnCreatedBy")
+  contributions        Contribution[]
+  arisanParticipations ArisanParticipant[]
+  arisanReceived       ArisanPeriod[]
+  posts                Post[]
+  comments             Comment[]
+  eventsCreated        Event[]
+  rsvps                Rsvp[]
+
+  @@map("users")
+}
+
+model Community {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String?  @unique
+  description String?
+  logoUrl     String?  @map("logo_url")
+  themeColor  String   @default("#4F46E5") @map("theme_color")
+  createdById String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  createdBy          User?               @relation("CommunityCreatedBy", fields: [createdById], references: [id])
+  paymentConfig      PaymentConfig?
+  memberships        Membership[]
+  pockets            Pocket[]
+  transactions       Transaction[]
+  duesSchedules      DuesSchedule[]
+  contributions      Contribution[]
+  arisanParticipants ArisanParticipant[]
+  arisanPeriods      ArisanPeriod[]
+  posts              Post[]
+  comments           Comment[]
+  events             Event[]
+  rsvps              Rsvp[]
+
+  @@map("communities")
+}
+
+// Rekening/gateway PER KOMUNITAS. Kyklos hanya menyimpan config + mencatat.
+// Jangan pernah kirim gatewayCredentials ke member (omit di DTO/serializer).
+model PaymentConfig {
+  id                 String           @id @default(uuid())
+  communityId        String           @unique @map("community_id")
+  method             PaymentMethod    @default(manual_transfer)
+  bankName           String?          @map("bank_name")
+  accountNumber      String?          @map("account_number")
+  accountHolder      String?          @map("account_holder")
+  gatewayProvider    PaymentProvider? @map("gateway_provider")
+  gatewayMerchantId  String?          @map("gateway_merchant_id")
+  gatewayCredentials String?          @map("gateway_credentials")
+  isActive           Boolean          @default(true) @map("is_active")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@map("payment_configs")
+}
+
+model Membership {
+  id          String           @id @default(uuid())
+  communityId String           @map("community_id")
+  userId      String           @map("user_id")
+  role        UserRole         @default(member)
+  status      MembershipStatus @default(active)
+  joinedAt    DateTime         @default(now()) @map("joined_at")
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([communityId])
+  @@index([userId])
+  @@map("memberships")
+}
+
+model Pocket {
+  id          String     @id @default(uuid())
+  communityId String     @map("community_id")
+  name        String
+  type        PocketType @default(treasury)
+  balance     BigInt     @default(0) // DITURUNKAN dari transactions via trigger — jangan set dari app
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  community          Community           @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  transactions       Transaction[]
+  duesSchedules      DuesSchedule[]
+  arisanParticipants ArisanParticipant[]
+  arisanPeriods      ArisanPeriod[]
+
+  @@index([communityId])
+  @@map("pockets")
+}
+
+// LEDGER — APPEND-ONLY (UPDATE/DELETE diblok trigger). Koreksi = transaksi baru.
+model Transaction {
+  id          String       @id @default(uuid())
+  communityId String       @map("community_id")
+  pocketId    String       @map("pocket_id")
+  memberId    String?      @map("member_id")
+  amount      BigInt
+  direction   TxnDirection
+  category    String?
+  note        String?
+  status      TxnStatus    @default(confirmed)
+  createdById String?      @map("created_by")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  pocket    Pocket    @relation(fields: [pocketId], references: [id], onDelete: Cascade)
+  member    User?     @relation("TxnActor", fields: [memberId], references: [id])
+  createdBy User?     @relation("TxnCreatedBy", fields: [createdById], references: [id])
+
+  contributions Contribution[]
+
+  @@index([communityId])
+  @@index([pocketId])
+  @@index([memberId])
+  @@map("transactions")
+}
+
+model DuesSchedule {
+  id          String   @id @default(uuid())
+  communityId String   @map("community_id")
+  pocketId    String   @map("pocket_id")
+  title       String
+  amount      BigInt
+  period      String   @default("monthly") // monthly | weekly | once
+  dueDate     DateTime? @map("due_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  community     Community      @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  pocket        Pocket         @relation(fields: [pocketId], references: [id], onDelete: Cascade)
+  contributions Contribution[]
+
+  @@index([communityId])
+  @@map("dues_schedules")
+}
+
+model ArisanParticipant {
+  id          String  @id @default(uuid())
+  communityId String  @map("community_id")
+  pocketId    String  @map("pocket_id")
+  memberId    String  @map("member_id")
+  joinOrder   Int?    @map("join_order")
+  hasReceived Boolean @default(false) @map("has_received")
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  pocket    Pocket    @relation(fields: [pocketId], references: [id], onDelete: Cascade)
+  member    User      @relation(fields: [memberId], references: [id])
+
+  @@unique([pocketId, memberId])
+  @@map("arisan_participants")
+}
+
+model ArisanPeriod {
+  id                String       @id @default(uuid())
+  communityId       String       @map("community_id")
+  pocketId          String       @map("pocket_id")
+  roundNo           Int          @map("round_no")
+  periodDate        DateTime?    @map("period_date")
+  recipientMemberId String?      @map("recipient_member_id")
+  status            ArisanStatus @default(open)
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  community     Community      @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  pocket        Pocket         @relation(fields: [pocketId], references: [id], onDelete: Cascade)
+  recipient     User?          @relation(fields: [recipientMemberId], references: [id])
+  contributions Contribution[]
+
+  @@unique([pocketId, roundNo])
+  @@index([pocketId])
+  @@map("arisan_periods")
+}
+
+model Contribution {
+  id             String             @id @default(uuid())
+  communityId    String             @map("community_id")
+  scheduleId     String?            @map("schedule_id")
+  arisanPeriodId String?            @map("arisan_period_id")
+  memberId       String             @map("member_id")
+  amount         BigInt
+  status         ContributionStatus @default(unpaid)
+  proofUrl       String?            @map("proof_url")
+  paidAt         DateTime?          @map("paid_at")
+  transactionId  String?            @map("transaction_id")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  community    Community     @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  schedule     DuesSchedule? @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  arisanPeriod ArisanPeriod? @relation(fields: [arisanPeriodId], references: [id], onDelete: Cascade)
+  member       User          @relation(fields: [memberId], references: [id])
+  transaction  Transaction?  @relation(fields: [transactionId], references: [id])
+
+  @@index([communityId])
+  @@index([memberId])
+  @@index([scheduleId])
+  @@map("contributions")
+}
+
+model Post {
+  id             String   @id @default(uuid())
+  communityId    String   @map("community_id")
+  authorId       String   @map("author_id")
+  body           String
+  isAnnouncement Boolean  @default(false) @map("is_announcement")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id])
+  comments  Comment[]
+
+  @@index([communityId])
+  @@map("posts")
+}
+
+model Comment {
+  id          String   @id @default(uuid())
+  communityId String   @map("community_id")
+  postId      String   @map("post_id")
+  authorId    String   @map("author_id")
+  body        String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id])
+
+  @@index([postId])
+  @@map("comments")
+}
+
+model Event {
+  id          String    @id @default(uuid())
+  communityId String    @map("community_id")
+  title       String
+  location    String?
+  eventDate   DateTime? @map("event_date")
+  description String?
+  createdById String?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation(fields: [createdById], references: [id])
+  rsvps     Rsvp[]
+
+  @@index([communityId])
+  @@map("events")
+}
+
+model Rsvp {
+  id          String     @id @default(uuid())
+  communityId String     @map("community_id")
+  eventId     String     @map("event_id")
+  memberId    String     @map("member_id")
+  status      RsvpStatus @default(maybe)
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member    User      @relation(fields: [memberId], references: [id])
+
+  @@unique([eventId, memberId])
+  @@index([eventId])
+  @@map("rsvps")
+}
