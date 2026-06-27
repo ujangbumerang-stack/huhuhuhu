@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { login } from '@/lib/auth';
+import { api } from '@/lib/api';
 
 export default function HalamanLogin() {
     const pengarahRute = useRouter();
@@ -27,6 +28,11 @@ export default function HalamanLogin() {
         
         try {
             await login(formulirMasuk.email, formulirMasuk.kataSandi);
+            // Ambil daftar komunitas langsung setelah login dan simpan slug aktif ke localStorage
+            const daftarKomunitas = await api.get<any[]>('/communities');
+            if (daftarKomunitas && daftarKomunitas.length > 0) {
+                localStorage.setItem('kyklos_active_community_slug', daftarKomunitas[0].slug);
+            }
             pengarahRute.push('/dashboard');
         } catch (kesalahan: any) {
             setPesanKesalahan(kesalahan.message || 'Gagal masuk. Silakan periksa kembali email dan kata sandi Anda.');
@@ -141,7 +147,7 @@ export default function HalamanLogin() {
                                     type="email" 
                                     required 
                                     placeholder="nama@email.com"
-                                    className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F3A4B]/20 focus:border-[#0F3A4B] transition placeholder:text-slate-400"
+                                    className="w-full border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F3A4B]/20 focus:border-[#0F3A4B] text-slate-900 placeholder:text-slate-500 transition"
                                     value={formulirMasuk.email} 
                                     onChange={e => setFormulirMasuk(f => ({ ...f, email: e.target.value }))} 
                                 />
@@ -162,7 +168,7 @@ export default function HalamanLogin() {
                                     type={tampilkanKataSandi ? 'text' : 'password'} 
                                     required 
                                     placeholder="••••••••"
-                                    className="w-full border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F3A4B]/20 focus:border-[#0F3A4B] transition placeholder:text-slate-400"
+                                    className="w-full border border-slate-300 rounded-xl pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F3A4B]/20 focus:border-[#0F3A4B] text-slate-900 placeholder:text-slate-500 transition"
                                     value={formulirMasuk.kataSandi} 
                                     onChange={e => setFormulirMasuk(f => ({ ...f, kataSandi: e.target.value }))} 
                                 />

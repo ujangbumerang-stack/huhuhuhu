@@ -31,9 +31,9 @@ const DEFAULT_MOCK_DATA = {
         }
     ],
     pockets: [
-        { id: 'pocket_1', communityId: 'comm_1', name: 'Kas RT Utama', type: 'treasury', balance: 10000000 },
-        { id: 'pocket_2', communityId: 'comm_1', name: 'Arisan Ibu-Ibu', type: 'arisan', balance: 3000000 },
-        { id: 'pocket_3', communityId: 'comm_1', name: 'Keluarga Event', type: 'event', balance: 2000000 }
+        { id: 'pocket_1', communityId: 'comm_1', name: 'Kas Umum', type: 'treasury', balance: 15000000, status: 'safe' },
+        { id: 'pocket_2', communityId: 'comm_1', name: 'Arisan Bulanan', type: 'arisan', balance: 20200000, status: 'active' },
+        { id: 'pocket_3', communityId: 'comm_1', name: 'Dana Darurat', type: 'dues', balance: 10000000, status: 'locked' }
     ],
     transactions: [
         { id: 'tx_1', pocketId: 'pocket_1', amount: 250000, direction: 'out', note: 'Pembelian Kopi & Snack di Aruna', category: 'pengeluaran_manual', createdAt: new Date(Date.now() - 3600000).toISOString(), member: { name: 'Pak RT (Bendahara)' } },
@@ -42,6 +42,11 @@ const DEFAULT_MOCK_DATA = {
     contributions: [
         { id: 'contr_1', amount: 100000, status: 'unpaid', member: { id: 'user_2', name: 'Bu Linda', email: 'linda@mail.com' }, schedule: { title: 'Iuran Bulanan RT' } },
         { id: 'contr_2', amount: 100000, status: 'paid', member: { id: 'user_3', name: 'Pak Budi', email: 'budi@mail.com' }, schedule: { title: 'Iuran Bulanan RT' } }
+    ],
+    pendingVerifications: [
+        { id: 'pv_1', member: { name: 'Budi Wijaya', avatar: 'BW', color: 'bg-slate-800' }, date: 'Oct 24, 2023', amount: 500000, pocket: 'Kas Umum', pocketId: 'pocket_1' },
+        { id: 'pv_2', member: { name: 'Siti Aminah', avatar: 'SA', color: 'bg-blue-400' }, date: 'Oct 23, 2023', amount: 1000000, pocket: 'Arisan Bulanan', pocketId: 'pocket_2' },
+        { id: 'pv_3', member: { name: 'Dian R.', avatar: 'DR', color: 'bg-gray-400' }, date: 'Oct 22, 2023', amount: 250000, pocket: 'Kas Umum', pocketId: 'pocket_1' }
     ],
     members: [
         { userId: 'user_1', role: 'admin', user: { id: 'user_1', name: 'Pak RT (Bendahara)' } },
@@ -69,6 +74,11 @@ function saveMockState(state: any) {
 
 // Handler request palsu untuk simulasi API
 async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const token = getToken();
+    if (!token && (path === '/auth/me' || path.startsWith('/communities') || path.startsWith('/pockets') || path.startsWith('/verifications'))) {
+        throw new Error('Unauthorized');
+    }
+
     const state = getMockState();
     const method = init.method ?? 'GET';
     const body = init.body ? JSON.parse(init.body as string) : {};
@@ -115,6 +125,39 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
             saveMockState(state);
             return newTx as unknown as T;
         }
+
+        // Endpoint verifikasi kontribusi warga oleh admin
+        const verifyMatch = path.match(/^\/verifications\/([^/]+)\/verify$/);
+        if (verifyMatch) {
+            const verificationId = verifyMatch[1];
+            
+            // Temukan item verifikasi dan hapus
+            const item = state.pendingVerifications.find((v: any) => v.id === verificationId);
+            if (item) {
+                state.pendingVerifications = state.pendingVerifications.filter((v: any) => v.id !== verificationId);
+                
+                // Tambahkan dana ke kantong terkait secara lokal
+                const p = state.pockets.find((pocket: any) => pocket.id === item.pocketId);
+                if (p) {
+                    p.balance = (parseInt(p.balance, 10) || 0) + item.amount;
+                }
+                
+                // Tambahkan ke riwayat transaksi
+                state.transactions.unshift({
+                    id: `tx_${Date.now()}`,
+                    pocketId: item.pocketId,
+                    amount: item.amount.toString(),
+                    direction: 'in',
+                    note: `Verifikasi iuran: ${item.member.name}`,
+                    category: 'iuran_warga',
+                    createdAt: new Date().toISOString(),
+                    member: { name: item.member.name }
+                });
+                
+                saveMockState(state);
+            }
+            return { success: true } as unknown as T;
+        }
     }
 
     if (method === 'GET') {
@@ -156,6 +199,7 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
                 pockets: state.pockets.map((p: any) => ({ ...p, balance: p.balance.toString() })),
                 recentTransactions: state.transactions.slice(0, 10),
                 contributions: state.contributions,
+                pendingVerifications: state.pendingVerifications || [],
                 members: state.members
             } as unknown as T;
         }

@@ -1,10 +1,9 @@
 'use client';
-
+ 
 // Mengimpor React hooks dan komponen Next.js
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getMe } from '@/lib/auth';
-
 // Definisi tipe data untuk pengguna aktif
 interface DataPengguna {
     name: string;
@@ -67,13 +66,13 @@ export default function HalamanUtama() {
                         </a>
                     </nav>
 
-                    {/* Tombol Aksi Kanan */}
+                    {/* Tombol Aksi Kanan (Menampilkan opsi masuk dan buat komunitas) */}
                     <div className="flex items-center gap-4">
                         <Link href="/login" className="text-sm font-semibold text-[#0F3A4B] hover:opacity-80 transition px-3 py-2">
                             Log In
                         </Link>
-                        <Link href="/signup" className="text-sm font-medium bg-[#0F3A4B] text-white px-4 py-2 rounded-md hover:bg-[#0c2e3c] transition duration-200 shadow-sm">
-                            Get Started
+                        <Link href={penggunaAktif ? "/dashboard" : "/login"} className="text-sm font-medium bg-[#0F3A4B] text-white px-4 py-2 rounded-md hover:bg-[#0c2e3c] transition duration-200 shadow-sm">
+                            Buat Komunitas
                         </Link>
                     </div>
                 </div>
@@ -108,7 +107,7 @@ export default function HalamanUtama() {
                                     Masuk ke Dashboard <span>→</span>
                                 </Link>
                             ) : (
-                                <Link href="/signup" className="bg-[#0F3A4B] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#0c2e3c] transition duration-200 shadow-md">
+                                <Link href="/login" className="bg-[#0F3A4B] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#0c2e3c] transition duration-200 shadow-md">
                                     Mulai Sekarang
                                 </Link>
                             )}
@@ -217,6 +216,8 @@ export default function HalamanUtama() {
 
                 </div>
             </section>
+ 
+
 
             {/* Bagian Fitur (Bento Grid Layout) */}
             <section id="fitur" className="max-w-7xl mx-auto px-6 py-20 border-t border-gray-100">
@@ -524,7 +525,7 @@ export default function HalamanUtama() {
                 {/* Bar Hak Cipta Bawah */}
                 <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <p className="text-xs text-gray-400">
-                        &copy; 2023 Kyklos Enterprise Systems. Hak Cipta Dilindungi.
+                        &copy; 2026 Kyklos Enterprise Systems. Hak Cipta Dilindungi.
                     </p>
                     <div className="flex gap-6 text-xs text-gray-400">
                         <a href="#tentang" className="hover:text-white transition">Privacy Policy</a>

@@ -148,7 +148,7 @@ export default function HalamanDaftar() {
                                     type="text" 
                                     required 
                                     placeholder="Masukkan nama lengkap Anda"
-                                    className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F3A4B]/20 focus:border-[#0F3A4B] transition placeholder:text-slate-400"
+                                    className="w-full border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F3A4B]/20 focus:border-[#0F3A4B] text-slate-900 placeholder:text-slate-500 transition"
                                     value={formulirDaftar.namaLengkap} 
                                     onChange={e => setFormulirDaftar(f => ({ ...f, namaLengkap: e.target.value }))} 
                                 />
@@ -169,7 +169,7 @@ export default function HalamanDaftar() {
                                     type="email" 
                                     required 
                                     placeholder="contoh@email.com"
-                                    className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F3A4B]/20 focus:border-[#0F3A4B] transition placeholder:text-slate-400"
+                                    className="w-full border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F3A4B]/20 focus:border-[#0F3A4B] text-slate-900 placeholder:text-slate-500 transition"
                                     value={formulirDaftar.email} 
                                     onChange={e => setFormulirDaftar(f => ({ ...f, email: e.target.value }))} 
                                 />
@@ -190,7 +190,7 @@ export default function HalamanDaftar() {
                                     type={tampilkanKataSandi ? 'text' : 'password'} 
                                     required 
                                     placeholder="Buat kata sandi"
-                                    className="w-full border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F3A4B]/20 focus:border-[#0F3A4B] transition placeholder:text-slate-400"
+                                    className="w-full border border-slate-300 rounded-xl pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F3A4B]/20 focus:border-[#0F3A4B] text-slate-900 placeholder:text-slate-500 transition"
                                     value={formulirDaftar.kataSandi} 
                                     onChange={e => setFormulirDaftar(f => ({ ...f, kataSandi: e.target.value }))} 
                                 />
