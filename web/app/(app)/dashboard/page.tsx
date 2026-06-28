@@ -157,10 +157,10 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Action Required Card */}
-                <div className="bg-[#0B1E26] rounded-2xl p-6 shadow-sm flex flex-col justify-between text-white">
+                <div className="bg-primary rounded-2xl p-6 shadow-sm flex flex-col justify-between text-white">
                     <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-xs font-bold text-teal-300 uppercase tracking-wider">
-                            <svg className="w-4 h-4 text-teal-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <div className="flex items-center gap-2 text-xs font-bold text-white/80 uppercase tracking-wider">
+                            <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                             </svg>
                             Action Required
@@ -168,7 +168,7 @@ export default function DashboardPage() {
                         <h3 className="font-serif text-2xl font-bold tracking-tight text-white leading-tight">
                             {data.pendingVerifications?.length ?? 0} Verifications Pending
                         </h3>
-                        <p className="text-xs text-teal-200/80 leading-relaxed">
+                        <p className="text-xs text-white/70 leading-relaxed">
                             Requires immediate attention before end of month.
                         </p>
                     </div>
@@ -178,7 +178,7 @@ export default function DashboardPage() {
                             const element = document.getElementById('pending-verifications');
                             if (element) element.scrollIntoView({ behavior: 'smooth' });
                         }}
-                        className="w-full mt-6 py-2.5 bg-sky-100 hover:bg-sky-200 text-[#0B1E26] font-bold rounded-xl text-xs transition duration-200 cursor-pointer text-center select-none"
+                        className="w-full mt-6 py-2.5 bg-white hover:bg-gray-50 text-primary font-bold rounded-xl text-xs transition duration-200 cursor-pointer text-center select-none"
                     >
                         Review Now
                     </button>
@@ -190,10 +190,10 @@ export default function DashboardPage() {
                 <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Active Pockets</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {data.pockets.map(p => {
-                        let fillBg = 'bg-[#0F3A4B]';
+                        let fillBg = 'bg-primary';
                         let percentage = 90;
                         if (p.name === 'Arisan Bulanan') {
-                            fillBg = 'bg-[#ff6b00]';
+                            fillBg = 'bg-primary';
                             percentage = 100;
                         } else if (p.name === 'Social Fund') {
                             fillBg = 'bg-slate-500';
@@ -210,7 +210,7 @@ export default function DashboardPage() {
                                     </div>
                                     <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
                                         p.name === 'Arisan Bulanan' 
-                                            ? 'bg-orange-50 text-[#ff6b00]' 
+                                            ? 'bg-orange-50 text-primary' 
                                             : 'bg-sky-50 text-[#0284C7]'
                                     }`}>
                                         Active
@@ -285,7 +285,7 @@ export default function DashboardPage() {
                                             <td className="px-6 py-4">
                                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                                                     item.pocket === 'Arisan Bulanan'
-                                                        ? 'bg-orange-50 text-[#ff6b00]'
+                                                        ? 'bg-orange-50 text-primary'
                                                         : 'bg-[#E0F2FE]/50 text-[#0284C7]'
                                                 }`}>
                                                     {item.pocket}
@@ -312,3 +312,5 @@ export default function DashboardPage() {
         </div>
     );
 }
+
+

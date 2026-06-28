@@ -92,19 +92,23 @@ export default function SettingsPage() {
     }, [slug, router]);
 
     // Simpan Profile
-    const handleSaveProfile = (e: React.FormEvent) => {
+    const handleSaveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        localStorage.setItem('kyklos_user_profile', JSON.stringify(profileForm));
-        // Sinkronisasi data ke navbar utama
-        const event = new Event('storage');
-        window.dispatchEvent(event);
-        
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            await api.patch('/auth/profile', { name: profileForm.name });
+            localStorage.setItem('kyklos_user_profile', JSON.stringify(profileForm));
+            // Sinkronisasi data ke navbar utama
+            const event = new Event('storage');
+            window.dispatchEvent(event);
+            
             setSavedProfile(true);
             setTimeout(() => setSavedProfile(false), 3000);
-        }, 500);
+        } catch (err) {
+            console.error('Gagal menyimpan profile:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Simpan Bank Account
@@ -130,18 +134,8 @@ export default function SettingsPage() {
             // Update warna primer di tingkat DOM CSS Variables secara langsung
             document.documentElement.style.setProperty('--community-primary', selectedThemeColor);
             
-            // Update warna di API/Local State komunitas
-            const list = await api.get<any[]>('/communities');
-            const updatedList = list.map(c => {
-                if (c.id === communityId) {
-                    return { ...c, themeColor: selectedThemeColor };
-                }
-                return c;
-            });
-            localStorage.setItem('kyklos_mock_state', JSON.stringify({
-                ...JSON.parse(localStorage.getItem('kyklos_mock_state') || '{}'),
-                communities: updatedList
-            }));
+            // Update warna di API backend komunitas
+            await api.patch(`/communities/${communityId}`, { themeColor: selectedThemeColor });
             
             // Trigger event storage untuk memicu pembaruan sidebar layout
             const event = new Event('storage');
@@ -183,7 +177,7 @@ export default function SettingsPage() {
                         onClick={() => setActiveTab('profile')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition duration-200 whitespace-nowrap cursor-pointer focus:outline-none ${
                             activeTab === 'profile'
-                                ? 'bg-orange-50 text-[#ff6b00]'
+                                ? 'bg-orange-50 text-primary'
                                 : 'text-slate-600 hover:bg-slate-50'
                         }`}
                     >
@@ -193,7 +187,7 @@ export default function SettingsPage() {
                         onClick={() => setActiveTab('bank')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition duration-200 whitespace-nowrap cursor-pointer focus:outline-none ${
                             activeTab === 'bank'
-                                ? 'bg-orange-50 text-[#ff6b00]'
+                                ? 'bg-orange-50 text-primary'
                                 : 'text-slate-600 hover:bg-slate-50'
                         }`}
                     >
@@ -203,7 +197,7 @@ export default function SettingsPage() {
                         onClick={() => setActiveTab('theme')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition duration-200 whitespace-nowrap cursor-pointer focus:outline-none ${
                             activeTab === 'theme'
-                                ? 'bg-orange-50 text-[#ff6b00]'
+                                ? 'bg-orange-50 text-primary'
                                 : 'text-slate-600 hover:bg-slate-50'
                         }`}
                     >
@@ -222,11 +216,11 @@ export default function SettingsPage() {
                                 onClick={() => setActiveTab('profile')}
                                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition duration-200 text-left cursor-pointer focus:outline-none w-full ${
                                     activeTab === 'profile'
-                                        ? 'text-[#ff6b00]'
+                                        ? 'text-primary'
                                         : 'text-slate-700 hover:bg-slate-50'
                                 }`}
                             >
-                                <svg className={`w-4.5 h-4.5 ${activeTab === 'profile' ? 'text-[#ff6b00]' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <svg className={`w-4.5 h-4.5 ${activeTab === 'profile' ? 'text-primary' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-2.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                 </svg>
                                 <span>Edit Profile</span>
@@ -237,11 +231,11 @@ export default function SettingsPage() {
                                 onClick={() => setActiveTab('bank')}
                                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition duration-200 text-left cursor-pointer focus:outline-none w-full ${
                                     activeTab === 'bank'
-                                        ? 'text-[#ff6b00]'
+                                        ? 'text-primary'
                                         : 'text-slate-700 hover:bg-slate-50'
                                 }`}
                             >
-                                <svg className={`w-4.5 h-4.5 ${activeTab === 'bank' ? 'text-[#ff6b00]' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <svg className={`w-4.5 h-4.5 ${activeTab === 'bank' ? 'text-primary' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                 </svg>
                                 <span>Bank Account</span>
@@ -258,11 +252,11 @@ export default function SettingsPage() {
                                 onClick={() => setActiveTab('theme')}
                                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition duration-200 text-left cursor-pointer focus:outline-none w-full ${
                                     activeTab === 'theme'
-                                        ? 'text-[#ff6b00]'
+                                        ? 'text-primary'
                                         : 'text-slate-700 hover:bg-slate-50'
                                 }`}
                             >
-                                <svg className={`w-4.5 h-4.5 ${activeTab === 'theme' ? 'text-[#ff6b00]' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <svg className={`w-4.5 h-4.5 ${activeTab === 'theme' ? 'text-primary' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                                 </svg>
                                 <span>Tema</span>
@@ -285,7 +279,7 @@ export default function SettingsPage() {
                             {/* Avatar Circle */}
                             <div className="flex flex-col items-center justify-center py-2 select-none">
                                 <div className="relative">
-                                    <div className="w-24 h-24 rounded-full bg-[#ff6b00] flex items-center justify-center text-white text-3xl font-bold font-sans select-none">
+                                    <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white text-3xl font-bold font-sans select-none">
                                         {profileForm.name ? profileForm.name[0].toUpperCase() : 'U'}
                                     </div>
                                     <button type="button" className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center hover:bg-slate-50 cursor-pointer transition">
@@ -342,7 +336,7 @@ export default function SettingsPage() {
                                         className="w-full text-sm font-semibold text-slate-900 focus:outline-none bg-transparent"
                                     />
                                     {profileForm.phone === 'Not added' && (
-                                        <button type="button" onClick={() => alert('Fitur verifikasi telepon sedang dikembangkan.')} className="text-xs font-bold text-[#ff6b00] hover:underline cursor-pointer select-none">
+                                        <button type="button" onClick={() => alert('Fitur verifikasi telepon sedang dikembangkan.')} className="text-xs font-bold text-primary hover:underline cursor-pointer select-none">
                                             Verify
                                         </button>
                                     )}
@@ -399,7 +393,7 @@ export default function SettingsPage() {
                                 <select 
                                     value={bankForm.method} 
                                     onChange={e => setBankForm(f => ({ ...f, method: e.target.value }))}
-                                    className="w-full border border-slate-300 bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#0F3A4B] focus:ring-1 focus:ring-[#0F3A4B]/20 text-slate-900 placeholder:text-slate-500 transition"
+                                    className="w-full border border-slate-300 bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-slate-900 placeholder:text-slate-500 transition"
                                 >
                                     <option value="manual_transfer">Transfer Manual (Bank lokal)</option>
                                     <option value="gateway">Payment Gateway Otomatis (Midtrans)</option>
@@ -417,7 +411,7 @@ export default function SettingsPage() {
                                                 value={bankForm.bankName} 
                                                 onChange={e => setBankForm(f => ({ ...f, bankName: e.target.value }))}
                                                 placeholder="contoh: BCA, Bank Mandiri, BNI" 
-                                                className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#0F3A4B] text-slate-900 placeholder:text-slate-500" 
+                                                className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-primary text-slate-900 placeholder:text-slate-500" 
                                             />
                                         </div>
                                         <div className="space-y-1.5">
@@ -427,7 +421,7 @@ export default function SettingsPage() {
                                                 value={bankForm.accountNumber} 
                                                 onChange={e => setBankForm(f => ({ ...f, accountNumber: e.target.value }))}
                                                 placeholder="contoh: 8012345678"
-                                                className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#0F3A4B] text-slate-900 placeholder:text-slate-500" 
+                                                className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-primary text-slate-900 placeholder:text-slate-500" 
                                             />
                                         </div>
                                     </div>
@@ -438,7 +432,7 @@ export default function SettingsPage() {
                                             value={bankForm.accountHolder} 
                                             onChange={e => setBankForm(f => ({ ...f, accountHolder: e.target.value }))}
                                             placeholder="Nama sesuai di buku tabungan bank"
-                                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#0F3A4B] text-slate-900 placeholder:text-slate-500" 
+                                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-primary text-slate-900 placeholder:text-slate-500" 
                                         />
                                     </div>
                                 </div>
@@ -462,7 +456,7 @@ export default function SettingsPage() {
                                             value={bankForm.serverKey} 
                                             onChange={e => setBankForm(f => ({ ...f, serverKey: e.target.value }))}
                                             placeholder="SB-Mid-server-xxxx" 
-                                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-[#0F3A4B] text-slate-900 placeholder:text-slate-500" 
+                                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-primary text-slate-900 placeholder:text-slate-500" 
                                         />
                                     </div>
                                     <div className="space-y-1.5">
@@ -472,7 +466,7 @@ export default function SettingsPage() {
                                             value={bankForm.clientKey} 
                                             onChange={e => setBankForm(f => ({ ...f, clientKey: e.target.value }))}
                                             placeholder="SB-Mid-client-xxxx" 
-                                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-[#0F3A4B] text-slate-900 placeholder:text-slate-500" 
+                                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-primary text-slate-900 placeholder:text-slate-500" 
                                         />
                                     </div>
                                 </div>
@@ -483,7 +477,7 @@ export default function SettingsPage() {
                                 <button 
                                     type="submit" 
                                     disabled={loading}
-                                    className={`w-full py-3 bg-[#0F3A4B] hover:bg-[#0c2e3c] text-white rounded-xl text-xs font-bold shadow-sm transition duration-200 cursor-pointer disabled:opacity-60 flex items-center justify-center select-none ${
+                                    className={`w-full py-3 bg-primary hover:brightness-90 hover:shadow-md text-white rounded-xl text-xs font-bold shadow-sm transition duration-200 cursor-pointer disabled:opacity-60 flex items-center justify-center select-none ${
                                         savedBank ? 'bg-emerald-600 hover:bg-emerald-700' : ''
                                     }`}
                                 >
@@ -542,7 +536,7 @@ export default function SettingsPage() {
                                 <button 
                                     type="submit" 
                                     disabled={loading}
-                                    className={`w-full py-3 bg-[#0F3A4B] hover:bg-[#0c2e3c] text-white rounded-xl text-xs font-bold shadow-sm transition duration-200 cursor-pointer disabled:opacity-60 flex items-center justify-center select-none ${
+                                    className={`w-full py-3 bg-primary hover:brightness-90 hover:shadow-md text-white rounded-xl text-xs font-bold shadow-sm transition duration-200 cursor-pointer disabled:opacity-60 flex items-center justify-center select-none ${
                                         savedTheme ? 'bg-emerald-600 hover:bg-emerald-700' : ''
                                     }`}
                                     style={{ backgroundColor: savedTheme ? undefined : selectedThemeColor }}
@@ -568,3 +562,6 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+
+

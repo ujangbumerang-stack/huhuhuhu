@@ -9,6 +9,9 @@ lerna-debug.log*
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+web/node_modules
+kyklos-api/node_modules
+
 # Runtime data
 pids
 *.pid
@@ -135,3 +138,13 @@ web/package-lock.json
 /.impeccable
 
 .impeccable
+
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+IMPECCABLE.md
+
+web/AGENTS.md
+web/CLAUDE.md
+web/GEMINI.md
+web/IMPECCABLE.md

@@ -10,6 +10,10 @@ html {
   --community-primary: #ff6b00; /* Warna orange khas KUYY! */
 }
 
+@theme {
+  --color-primary: #ff6b00;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -34,3 +38,11 @@ body {
 .clip-stand {
   clip-path: polygon(25% 0%, 75% 0%, 100% 100%, 0% 100%);
 }
+
+/* ponytail: explicit fallback — Tailwind v4 @theme not generating primary utilities */
+.bg-primary { background-color: var(--community-primary, #1e3a5f); }
+.text-primary { color: var(--community-primary, #1e3a5f); }
+.border-primary { border-color: var(--community-primary, #1e3a5f); }
+.bg-primary\/10 { background-color: color-mix(in srgb, var(--community-primary, #1e3a5f) 10%, transparent); }
+.hover\:bg-primary\/10:hover { background-color: color-mix(in srgb, var(--community-primary, #1e3a5f) 10%, transparent); }
+.ring-primary { --tw-ring-color: var(--community-primary, #1e3a5f); }

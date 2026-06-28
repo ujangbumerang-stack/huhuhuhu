@@ -4,7 +4,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { register } from '@/lib/auth';
+import { register, loginWithGoogle } from '@/lib/auth';
+import { api } from '@/lib/api';
+import { auth, googleProvider, signInWithPopup } from '@/lib/firebase';
 
 export default function HalamanDaftar() {
     const pengarahRute = useRouter();
@@ -41,10 +43,26 @@ export default function HalamanDaftar() {
         }
     }
 
-    // Menangani pendaftaran menggunakan akun Google (simulasi)
-    function menanganiDaftarGoogle() {
-        setPesanGoogle('Layanan Google Sign-Up sedang tidak tersedia. Silakan isi formulir pendaftaran secara manual.');
-        setTimeout(() => setPesanGoogle(''), 5000);
+    // Menangani pendaftaran menggunakan akun Google
+    async function menanganiDaftarGoogle() {
+        setSedangMemuat(true);
+        setPesanKesalahan('');
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            const idToken = await result.user.getIdToken();
+            
+            await loginWithGoogle(idToken);
+            
+            const daftarKomunitas = await api.get<any[]>('/communities');
+            if (daftarKomunitas && daftarKomunitas.length > 0) {
+                localStorage.setItem('kyklos_active_community_slug', daftarKomunitas[0].slug);
+            }
+            pengarahRute.push('/dashboard');
+        } catch (error: any) {
+            setPesanKesalahan(error.message || 'Gagal mendaftar dengan Google.');
+        } finally {
+            setSedangMemuat(false);
+        }
     }
 
     return (

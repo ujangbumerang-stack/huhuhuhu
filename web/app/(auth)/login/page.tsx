@@ -4,8 +4,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { login } from '@/lib/auth';
+import { login, loginWithGoogle } from '@/lib/auth';
 import { api } from '@/lib/api';
+import { auth, googleProvider, signInWithPopup } from '@/lib/firebase';
 
 export default function HalamanLogin() {
     const pengarahRute = useRouter();
@@ -41,10 +42,26 @@ export default function HalamanLogin() {
         }
     }
 
-    // Menangani aksi klik masuk menggunakan akun Google (simulasi)
-    function menanganiMasukGoogle() {
-        setPesanGoogle('Layanan Google Sign-In sedang tidak tersedia. Silakan gunakan email dan kata sandi.');
-        setTimeout(() => setPesanGoogle(''), 5000);
+    // Menangani aksi klik masuk menggunakan akun Google
+    async function menanganiMasukGoogle() {
+        setSedangMemuat(true);
+        setPesanKesalahan('');
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            const idToken = await result.user.getIdToken();
+            
+            await loginWithGoogle(idToken);
+            
+            const daftarKomunitas = await api.get<any[]>('/communities');
+            if (daftarKomunitas && daftarKomunitas.length > 0) {
+                localStorage.setItem('kyklos_active_community_slug', daftarKomunitas[0].slug);
+            }
+            pengarahRute.push('/dashboard');
+        } catch (error: any) {
+            setPesanKesalahan(error.message || 'Gagal masuk dengan Google.');
+        } finally {
+            setSedangMemuat(false);
+        }
     }
 
     return (

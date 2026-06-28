@@ -1,0 +1,243 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
+import { idr } from '@/lib/format';
+
+interface Due {
+    id: string;
+    title: string;
+    amount: number;
+    dueDate: string;
+    frequency: string;
+    isMandatory: boolean;
+}
+
+interface Contribution {
+    id: string;
+    amount: number;
+    status: 'pending' | 'paid' | 'verified' | string;
+    proofUrl?: string;
+    member: { id: string; name: string; email: string };
+    schedule: { id: string; title: string };
+}
+
+export default function ContributionsPage() {
+    const router = useRouter();
+    const [slug, setSlug] = useState('keluarga-cemara');
+    const [communityId, setCommunityId] = useState('');
+    const [dues, setDues] = useState<Due[]>([]);
+    const [contributions, setContributions] = useState<Contribution[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const [showNewDueModal, setShowNewDueModal] = useState(false);
+    const [newDueForm, setNewDueForm] = useState({
+        title: '', amount: '', dueDate: '', frequency: 'monthly', isMandatory: true
+    });
+
+    useEffect(() => {
+        const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
+        setSlug(activeSlug);
+    }, []);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const list = await api.get<any[]>('/communities');
+            const c = list.find(x => x.slug === slug) || list[0];
+            if (!c) {
+                router.push('/login');
+                return;
+            }
+            setCommunityId(c.id);
+
+            const fetchedDues = await api.get<Due[]>(`/communities/${c.id}/dues`);
+            const fetchedContribs = await api.get<Contribution[]>(`/communities/${c.id}/contributions`);
+            setDues(fetchedDues || []);
+            setContributions(fetchedContribs || []);
+        } catch (err) {
+            console.error('Failed to load contributions', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadData();
+    }, [slug, router]);
+
+    const handleCreateDue = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await api.post(`/communities/${communityId}/dues`, {
+                title: newDueForm.title,
+                amount: parseFloat(newDueForm.amount),
+                dueDate: newDueForm.dueDate || new Date().toISOString(),
+                frequency: newDueForm.frequency,
+                isMandatory: newDueForm.isMandatory
+            });
+            setShowNewDueModal(false);
+            setNewDueForm({ title: '', amount: '', dueDate: '', frequency: 'monthly', isMandatory: true });
+            loadData();
+        } catch (err: any) {
+            alert(err.message || 'Gagal membuat tagihan iuran');
+        }
+    };
+
+    const handleGenerate = async (id: string) => {
+        try {
+            await api.post(`/dues/${id}/generate`, {});
+            alert('Tagihan berhasil dibuat untuk seluruh anggota aktif.');
+            loadData();
+        } catch (err: any) {
+            alert(err.message || 'Gagal men-generate tagihan');
+        }
+    };
+
+    const handleVerify = async (id: string) => {
+        try {
+            await api.post(`/contributions/${id}/verify`, {});
+            loadData();
+        } catch (err: any) {
+            alert(err.message || 'Gagal memverifikasi pembayaran');
+        }
+    };
+
+    return (
+        <div className="space-y-6 relative">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                    <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Contributions & Dues</h1>
+                    <p className="text-xs sm:text-sm text-gray-400 font-semibold">Manage community dues, generate invoices, and track payments.</p>
+                </div>
+
+                <button 
+                    onClick={() => setShowNewDueModal(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-90 hover:shadow-md transition shadow-sm cursor-pointer"
+                >
+                    Create New Dues
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+                {dues.map(d => (
+                    <div key={d.id} className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm space-y-4 relative">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <h3 className="font-serif text-lg font-bold text-slate-800">{d.title}</h3>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">{d.frequency} • {d.isMandatory ? 'Mandatory' : 'Voluntary'}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="font-serif text-2xl font-black text-primary">{idr(d.amount)}</p>
+                        </div>
+                        <button 
+                            onClick={() => handleGenerate(d.id)}
+                            className="w-full py-2 bg-sky-50 text-[#0284C7] rounded-xl text-xs font-bold hover:bg-sky-100 transition cursor-pointer"
+                        >
+                            Generate Invoices for Members
+                        </button>
+                    </div>
+                ))}
+                {dues.length === 0 && !loading && (
+                    <div className="col-span-full py-8 text-center text-gray-400 text-sm">
+                        Belum ada jenis iuran yang dibuat.
+                    </div>
+                )}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden mt-6">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/20">
+                    <h3 className="font-serif text-base font-bold text-slate-800 tracking-tight">Recent Invoices</h3>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-gray-100 bg-gray-50/50 text-[10px] font-bold text-gray-400 uppercase tracking-wider select-none">
+                                <th className="px-6 py-4">Member</th>
+                                <th className="px-6 py-4">Due Schedule</th>
+                                <th className="px-6 py-4">Amount</th>
+                                <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {loading ? (
+                                <tr><td colSpan={5} className="px-6 py-10 text-center text-xs text-gray-400">Loading...</td></tr>
+                            ) : contributions.length === 0 ? (
+                                <tr><td colSpan={5} className="px-6 py-10 text-center text-xs text-gray-400 font-medium">Tidak ada data tagihan.</td></tr>
+                            ) : contributions.map(c => (
+                                <tr key={c.id} className="hover:bg-gray-50/30 transition duration-150">
+                                    <td className="px-6 py-3.5">
+                                        <p className="text-xs font-bold text-slate-800">{c.member?.name || 'Unknown'}</p>
+                                    </td>
+                                    <td className="px-6 py-3.5">
+                                        <p className="text-xs text-slate-600 font-medium">{c.schedule?.title}</p>
+                                    </td>
+                                    <td className="px-6 py-3.5">
+                                        <p className="text-xs font-extrabold text-slate-800">{idr(c.amount)}</p>
+                                    </td>
+                                    <td className="px-6 py-3.5">
+                                        <span className={`inline-flex items-center gap-1.5 text-[9px] font-bold px-2 py-0.5 rounded ${
+                                            c.status === 'verified' ? 'bg-sky-50 text-sky-700' :
+                                            c.status === 'paid' ? 'bg-emerald-50 text-emerald-700' :
+                                            'bg-orange-50 text-orange-600'
+                                        }`}>
+                                            {c.status.toUpperCase()}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-3.5 text-right">
+                                        {(c.status === 'paid' || c.status === 'pending') && (
+                                            <button 
+                                                onClick={() => handleVerify(c.id)}
+                                                className="px-3 py-1.5 border border-[#0284C7]/20 rounded-lg text-[10px] font-semibold text-[#0284C7] hover:bg-sky-50 transition cursor-pointer"
+                                            >
+                                                Verify
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {showNewDueModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+                    <form onSubmit={handleCreateDue} className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+                        <h3 className="font-serif text-lg font-bold">Create New Dues</h3>
+                        <input 
+                            type="text" required value={newDueForm.title}
+                            onChange={e => setNewDueForm({ ...newDueForm, title: e.target.value })}
+                            placeholder="Due Title (e.g. Uang Keamanan)"
+                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
+                        />
+                        <input 
+                            type="number" required value={newDueForm.amount}
+                            onChange={e => setNewDueForm({ ...newDueForm, amount: e.target.value })}
+                            placeholder="Amount"
+                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
+                        />
+                        <select
+                            value={newDueForm.frequency}
+                            onChange={e => setNewDueForm({ ...newDueForm, frequency: e.target.value })}
+                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
+                        >
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                            <option value="one-time">One-Time</option>
+                        </select>
+                        <div className="flex gap-2 pt-2">
+                            <button type="button" onClick={() => setShowNewDueModal(false)} className="flex-1 py-2 bg-gray-100 rounded-xl font-bold text-sm">Cancel</button>
+                            <button type="submit" className="flex-1 py-2 bg-primary text-white rounded-xl font-bold text-sm">Create</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+        </div>
+    );
+}
+
+
