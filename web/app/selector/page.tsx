@@ -19,6 +19,41 @@ export default function SelectorPage() {
     const [loading, setLoading] = useState(true);
     const [errorMsg, setErrorMsg] = useState('');
 
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [form, setForm] = useState({
+        name: '',
+        slug: '',
+        description: '',
+        themeColor: '#0F3A4B',
+    });
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleNameChange = (val: string) => {
+        const cleanSlug = val
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)+/g, '');
+        setForm({ ...form, name: val, slug: cleanSlug });
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!form.name.trim() || !form.slug.trim()) return;
+        setSubmitting(true);
+        try {
+            const newCommunity = await api.post<any>('/communities', form);
+            // Refresh communities list
+            const list = await api.get<Community[]>('/communities');
+            setCommunities(list || []);
+            setShowCreateModal(false);
+            setForm({ name: '', slug: '', description: '', themeColor: '#0F3A4B' });
+        } catch (err: any) {
+            alert(err.message || 'Gagal membuat komunitas.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     useEffect(() => {
         // Hapus active slug lama agar tidak ada residu
         localStorage.removeItem('kyklos_active_community_slug');
@@ -114,7 +149,7 @@ export default function SelectorPage() {
                     )})}
                     
                     <div 
-                        onClick={() => alert('Fitur buat komunitas baru saat ini sedang dalam pengembangan.')}
+                        onClick={() => setShowCreateModal(true)}
                         className="bg-slate-50/50 border-2 border-dashed border-slate-300 rounded-2xl p-6 hover:bg-slate-100 hover:border-[#0F3A4B]/50 transition-all cursor-pointer flex flex-col items-center justify-center space-y-4 text-center min-h-[220px] group"
                     >
                         <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-slate-400 shadow-sm border border-slate-200 group-hover:text-[#0F3A4B] group-hover:border-[#0F3A4B]/30 transition-colors">
@@ -141,6 +176,90 @@ export default function SelectorPage() {
                     </button>
                 </div>
             </div>
+
+            {/* ── Modal: Buat Komunitas Baru ── */}
+            {showCreateModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4 text-left">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-serif text-lg font-bold text-slate-800">Buat Komunitas Baru</h3>
+                            <button 
+                                onClick={() => setShowCreateModal(false)} 
+                                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 cursor-pointer transition"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Komunitas</label>
+                                <input
+                                    type="text" required
+                                    value={form.name}
+                                    onChange={e => handleNameChange(e.target.value)}
+                                    placeholder="Contoh: Keluarga Cemara, RT 02 RW 03"
+                                    className="w-full border border-slate-300 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-primary text-slate-800 font-semibold"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">URL Slug Komunitas</label>
+                                <div className="flex items-center gap-1.5 border border-slate-300 rounded-xl px-3.5 py-3 bg-slate-50 text-slate-500 text-sm">
+                                    <span className="select-none text-xs font-semibold">kyklos.app/</span>
+                                    <input
+                                        type="text" required
+                                        value={form.slug}
+                                        onChange={e => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                                        placeholder="slug-komunitas"
+                                        className="flex-1 bg-transparent focus:outline-none text-slate-800 font-semibold"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Deskripsi Singkat</label>
+                                <textarea
+                                    value={form.description}
+                                    onChange={e => setForm({ ...form, description: e.target.value })}
+                                    placeholder="Tulis tujuan atau deskripsi singkat komunitas Anda..."
+                                    className="w-full border border-slate-300 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-primary text-slate-800 min-h-[80px]"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Warna Tema Branding</label>
+                                <div className="flex items-center gap-3 border border-slate-300 rounded-xl px-3.5 py-2.5">
+                                    <input
+                                        type="color"
+                                        value={form.themeColor}
+                                        onChange={e => setForm({ ...form, themeColor: e.target.value })}
+                                        className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent flex-shrink-0"
+                                    />
+                                    <span className="text-xs font-mono font-bold text-slate-700 uppercase">{form.themeColor}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setShowCreateModal(false)} 
+                                    className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-sm text-slate-600 hover:bg-gray-200 transition cursor-pointer"
+                                >
+                                    Batal
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={submitting}
+                                    className="flex-1 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:brightness-95 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {submitting ? 'Membuat...' : 'Buat Komunitas'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
