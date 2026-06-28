@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { PocketsService } from './pockets.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -82,6 +82,16 @@ export class PocketsController {
   @UseGuards(AdminGuard)
   getWithdrawals(@Param('communityId') communityId: string) {
     return this.svc.getPendingWithdrawals(communityId);
+  }
+
+  @Get('communities/:communityId/transactions')
+  @UseGuards(MembershipGuard)
+  async getCommunityTransactions(
+    @Param('communityId') communityId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '25',
+  ) {
+    return this.svc.listCommunityTransactions(communityId, parseInt(page), parseInt(limit));
   }
 
   @Post('communities/:communityId/withdrawals/:id/approve')

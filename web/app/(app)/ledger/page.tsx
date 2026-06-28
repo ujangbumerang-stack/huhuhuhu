@@ -1,203 +1,326 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { idr } from '@/lib/format';
 
 interface Transaction {
     id: string;
     ref: string;
     date: string;
-    descriptionTitle: string;
-    descriptionDetails: string;
-    iconType: string;
+    rawDate: string;
+    note: string;
+    memberName: string;
     pocket: string;
+    pocketType: string;
+    direction: 'in' | 'out';
     status: string;
     amount: number;
 }
 
+const PAGE_SIZE = 25;
+
+function SkeletonRow() {
+    return (
+        <tr className="border-b border-gray-50">
+            {[1, 2, 3, 4, 5].map(i => (
+                <td key={i} className="px-6 py-4">
+                    <div className="h-3 bg-slate-100 rounded-full animate-pulse" style={{ width: `${[60, 80, 50, 40, 55][i - 1]}%` }} />
+                    {i <= 2 && <div className="h-2.5 bg-slate-50 rounded-full animate-pulse mt-1.5" style={{ width: `${[40, 60][i - 1]}%` }} />}
+                </td>
+            ))}
+        </tr>
+    );
+}
+
+const directionBadge = (dir: string) =>
+    dir === 'in'
+        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+        : 'bg-rose-50 text-rose-600 border border-rose-100';
+
+const pocketTypeBadge: Record<string, string> = {
+    KAS: 'bg-sky-50 text-sky-700',
+    ARISAN: 'bg-indigo-50 text-indigo-700',
+    PATUNGAN: 'bg-amber-50 text-amber-700',
+    IURAN: 'bg-violet-50 text-violet-700',
+};
+
 export default function LedgerPage() {
     const router = useRouter();
-    const [slug, setSlug] = useState<string>('keluarga-cemara');
+    const [communityId, setCommunityId] = useState('');
     const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [selectedPocketFilter, setSelectedPocketFilter] = useState('All Pockets');
-    const [selectedDateFilter, setSelectedDateFilter] = useState('Last 30 Days');
-    const [selectedStatusFilter, setSelectedStatusFilter] = useState('All Statuses');
-    const [ledgerSearchQuery, setLedgerSearchQuery] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [dirFilter, setDirFilter] = useState<'all' | 'in' | 'out'>('all');
+    const [pocketFilter, setPocketFilter] = useState('all');
+    const [pockets, setPockets] = useState<string[]>([]);
 
-    useEffect(() => {
-        const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
-        setSlug(activeSlug);
+    // Summary stats
+    const totalInflow = transactions.filter(t => t.direction === 'in').reduce((s, t) => s + t.amount, 0);
+    const totalOutflow = transactions.filter(t => t.direction === 'out').reduce((s, t) => s + t.amount, 0);
+
+    const fetchCommunity = useCallback(async () => {
+        const list = await api.get<any[]>('/communities');
+        const slug = localStorage.getItem('kyklos_active_community_slug') || '';
+        const c = list.find(x => x.slug === slug) || list[0];
+        if (!c) { router.push('/login'); return null; }
+        setCommunityId(c.id);
+        const ps = await api.get<any[]>(`/communities/${c.id}/pockets`);
+        setPockets(['all', ...(ps || []).map((p: any) => p.name)]);
+        return c.id;
+    }, [router]);
+
+    const fetchPage = useCallback(async (cId: string, p: number, replace = false) => {
+        if (replace) setLoading(true); else setLoadingMore(true);
+        try {
+            const res = await api.get<any>(`/communities/${cId}/transactions?page=${p}&limit=${PAGE_SIZE}`);
+            const rows: Transaction[] = (res.data || []).map((t: any) => ({
+                id: t.id,
+                ref: t.id.substring(0, 8).toUpperCase(),
+                date: new Date(t.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+                rawDate: t.createdAt,
+                note: t.note || (t.direction === 'in' ? 'Pemasukan' : 'Pengeluaran'),
+                memberName: t.member?.name || t.createdBy?.name || 'Sistem',
+                pocket: t.pocket?.name || '—',
+                pocketType: t.pocket?.type || 'KAS',
+                direction: t.direction,
+                status: t.status || 'confirmed',
+                amount: Number(t.amount),
+            }));
+            setTransactions(prev => replace ? rows : [...prev, ...rows]);
+            setTotal(res.total || 0);
+            setTotalPages(res.totalPages || 1);
+            setPage(p);
+        } catch (err) {
+            console.error('Failed to load ledger', err);
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
     }, []);
 
     useEffect(() => {
-        const fetchLedger = async () => {
-            setLoading(true);
-            try {
-                const list = await api.get<any[]>('/communities');
-                const c = list.find(x => x.slug === slug) || list[0];
-                if (!c) {
-                    router.push('/login');
-                    return;
-                }
-                const dashboard = await api.get<any>(`/communities/${c.id}/dashboard`);
-                const formattedTxs = dashboard.recentTransactions.map((t: any) => ({
-                    id: t.id,
-                    ref: t.id.substring(0, 8).toUpperCase(),
-                    date: new Date(t.createdAt).toLocaleDateString(),
-                    descriptionTitle: t.note || (t.direction === 'in' ? 'Deposit' : 'Withdrawal'),
-                    descriptionDetails: t.member?.name || 'System',
-                    iconType: t.direction === 'in' ? 'contributions' : 'charge',
-                    pocket: t.pocket?.name || 'Kas Umum',
-                    status: 'Verified',
-                    amount: t.direction === 'in' ? Number(t.amount) : -Number(t.amount)
-                }));
-                setTransactions(formattedTxs);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchLedger();
-    }, [slug, router]);
+        fetchCommunity().then(cId => {
+            if (cId) fetchPage(cId, 1, true);
+        });
+    }, []);
 
-    const usd = (val: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0
-        }).format(val);
+    const handleLoadMore = () => {
+        if (page < totalPages && !loadingMore && communityId) {
+            fetchPage(communityId, page + 1, false);
+        }
     };
 
-    const totalLedgerBalanceUsd = transactions.reduce((sum, t) => sum + t.amount, 0);
-    const totalInflowYtd = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
-    const totalOutflowYtd = Math.abs(transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0));
-
-    const filteredTransactions = transactions.filter(t => {
-        const matchesSearch = 
-            t.descriptionTitle.toLowerCase().includes(ledgerSearchQuery.toLowerCase()) ||
-            t.descriptionDetails.toLowerCase().includes(ledgerSearchQuery.toLowerCase()) ||
-            t.ref.toLowerCase().includes(ledgerSearchQuery.toLowerCase());
-
-        if (!matchesSearch) return false;
-
-        if (selectedPocketFilter !== 'All Pockets') {
-            if (selectedPocketFilter === 'Operational' && t.pocket !== 'Operational') return false;
-            if (selectedPocketFilter === 'Reserve Fund' && t.pocket !== 'Reserve Fund') return false;
-            if (selectedPocketFilter === 'Event Planning' && t.pocket !== 'Event Planning') return false;
-        }
-
-        if (selectedStatusFilter !== 'All Statuses') {
-            if (t.status !== selectedStatusFilter) return false;
-        }
-
-        return true;
+    const filtered = transactions.filter(t => {
+        const q = searchQuery.toLowerCase();
+        const matchSearch = !q || t.note.toLowerCase().includes(q) || t.memberName.toLowerCase().includes(q) || t.ref.toLowerCase().includes(q) || t.pocket.toLowerCase().includes(q);
+        const matchDir = dirFilter === 'all' || t.direction === dirFilter;
+        const matchPocket = pocketFilter === 'all' || t.pocket === pocketFilter;
+        return matchSearch && matchDir && matchPocket;
     });
 
+    const netFlow = totalInflow - totalOutflow;
+
     return (
-        <div className="space-y-6 relative">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
                 <div className="space-y-1">
-                    <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">
-                        Transaction Ledger
-                    </h1>
+                    <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Buku Besar Transaksi</h1>
                     <p className="text-xs sm:text-sm text-gray-400 font-semibold">
-                        A comprehensive record of all incoming and outgoing funds across community pockets.
+                        Rekap lengkap seluruh arus keluar-masuk dana komunitas.
+                        {!loading && <span className="ml-1 text-slate-500 font-bold">{total} transaksi total</span>}
                     </p>
                 </div>
+                <button
+                    onClick={() => communityId && fetchPage(communityId, 1, true)}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition cursor-pointer shadow-sm self-start"
+                >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Refresh
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm flex flex-col justify-between min-h-[120px]">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Ledger Balance</span>
-                    </div>
-                    <div className="flex items-baseline gap-2 mt-4">
-                        <p className="font-serif text-2xl font-extrabold text-slate-800 tracking-tight">{usd(totalLedgerBalanceUsd)}</p>
-                    </div>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Inflow */}
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm">
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-3">Total Pemasukan (loaded)</span>
+                    {loading ? (
+                        <div className="h-7 w-32 bg-slate-100 rounded-full animate-pulse" />
+                    ) : (
+                        <p className="font-serif text-2xl font-black text-emerald-600 tracking-tight">{idr(totalInflow)}</p>
+                    )}
                 </div>
-
-                <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm flex flex-col justify-between min-h-[120px]">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Inflow (YTD)</span>
-                    </div>
-                    <div className="space-y-2 mt-4">
-                        <p className="font-serif text-2xl font-extrabold text-slate-800 tracking-tight">{usd(totalInflowYtd)}</p>
-                    </div>
+                {/* Outflow */}
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm">
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-3">Total Pengeluaran (loaded)</span>
+                    {loading ? (
+                        <div className="h-7 w-32 bg-slate-100 rounded-full animate-pulse" />
+                    ) : (
+                        <p className="font-serif text-2xl font-black text-rose-500 tracking-tight">{idr(totalOutflow)}</p>
+                    )}
                 </div>
-
-                <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm flex flex-col justify-between min-h-[120px]">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Outflow (YTD)</span>
-                    </div>
-                    <div className="space-y-2 mt-4">
-                        <p className="font-serif text-2xl font-extrabold text-slate-800 tracking-tight">{usd(totalOutflowYtd)}</p>
-                    </div>
+                {/* Net */}
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm">
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-3">Net Flow (loaded)</span>
+                    {loading ? (
+                        <div className="h-7 w-32 bg-slate-100 rounded-full animate-pulse" />
+                    ) : (
+                        <p className={`font-serif text-2xl font-black tracking-tight ${netFlow >= 0 ? 'text-slate-800' : 'text-rose-500'}`}>{netFlow >= 0 ? '+' : ''}{idr(netFlow)}</p>
+                    )}
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden mt-6">
+            {/* Filter Bar */}
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[180px]">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Cari catatan, anggota, REF..."
+                        className="w-full border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-xs focus:outline-none focus:border-primary text-slate-700 bg-white"
+                    />
+                </div>
+                <select
+                    value={dirFilter}
+                    onChange={e => setDirFilter(e.target.value as any)}
+                    className="border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-primary text-slate-700 bg-white cursor-pointer"
+                >
+                    <option value="all">Semua Arah</option>
+                    <option value="in">Pemasukan</option>
+                    <option value="out">Pengeluaran</option>
+                </select>
+                <select
+                    value={pocketFilter}
+                    onChange={e => setPocketFilter(e.target.value)}
+                    className="border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-primary text-slate-700 bg-white cursor-pointer"
+                >
+                    {pockets.map(p => (
+                        <option key={p} value={p}>{p === 'all' ? 'Semua Kantong' : p}</option>
+                    ))}
+                </select>
+                {(searchQuery || dirFilter !== 'all' || pocketFilter !== 'all') && (
+                    <button
+                        onClick={() => { setSearchQuery(''); setDirFilter('all'); setPocketFilter('all'); }}
+                        className="text-[10px] font-bold text-slate-400 hover:text-slate-600 px-2.5 py-2 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition cursor-pointer"
+                    >
+                        Reset Filter
+                    </button>
+                )}
+            </div>
+
+            {/* Table */}
+            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="border-b border-gray-100 bg-gray-50/50 text-[10px] font-bold text-gray-400 uppercase tracking-wider select-none">
-                                <th className="px-6 py-4">Date & Ref</th>
-                                <th className="px-6 py-4">Description</th>
-                                <th className="px-6 py-4">Pocket</th>
-                                <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4 text-right">Amount</th>
+                            <tr className="border-b border-gray-100 bg-gray-50/50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-6 py-4">Tanggal & REF</th>
+                                <th className="px-6 py-4">Catatan / Anggota</th>
+                                <th className="px-6 py-4">Kantong</th>
+                                <th className="px-6 py-4">Arah</th>
+                                <th className="px-6 py-4 text-right">Nominal</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {loading ? (
-                                <tr><td colSpan={5} className="px-6 py-10 text-center text-xs text-gray-400">Loading...</td></tr>
-                            ) : filteredTransactions.length === 0 ? (
+                                Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} />)
+                            ) : filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-10 text-center text-xs text-gray-400 font-medium">
-                                        Tidak ada riwayat transaksi yang cocok dengan filter.
+                                    <td colSpan={5} className="px-6 py-14 text-center">
+                                        <div className="space-y-2">
+                                            <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-400">
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                            </div>
+                                            <p className="text-xs text-gray-400 font-medium">Tidak ada transaksi yang cocok.</p>
+                                        </div>
                                     </td>
                                 </tr>
-                            ) : (
-                                filteredTransactions.map((t) => {
-                                    const isVerified = t.status === 'Verified';
-                                    const isPositive = t.amount > 0;
-                                    return (
-                                        <tr key={t.id} className="hover:bg-gray-50/30 transition duration-150">
-                                            <td className="px-6 py-3.5">
-                                                <div>
-                                                    <p className="text-xs font-bold text-slate-800 leading-tight">{t.date}</p>
-                                                    <p className="text-[10px] text-gray-400 font-medium mt-0.5">{t.ref}</p>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-3.5">
-                                                <div className="flex items-center gap-3">
-                                                    <div>
-                                                        <p className="text-xs font-bold text-slate-800 leading-tight">{t.descriptionTitle}</p>
-                                                        <p className="text-[10px] text-gray-400 font-semibold mt-0.5">{t.descriptionDetails}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-3.5 text-xs font-semibold text-slate-600">
-                                                {t.pocket}
-                                            </td>
-                                            <td className="px-6 py-3.5">
-                                                <span className="inline-flex items-center gap-1.5 text-[9px] font-bold px-2 py-0.5 rounded bg-sky-50 text-[#0284C7] border border-[#E0F2FE]">
-                                                    <span className="w-1 h-1 rounded-full bg-[#0284C7]"></span>
-                                                    {t.status}
-                                                </span>
-                                            </td>
-                                            <td className={`px-6 py-3.5 text-xs font-extrabold text-right ${isPositive ? 'text-[#0284C7]' : 'text-slate-800'}`}>
-                                                {isPositive ? `+${usd(t.amount)}` : usd(t.amount)}
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
+                            ) : filtered.map((t) => (
+                                <tr key={t.id} className="hover:bg-slate-50/40 transition duration-100 group">
+                                    <td className="px-6 py-3.5">
+                                        <p className="text-xs font-bold text-slate-800 leading-tight">{t.date}</p>
+                                        <p className="text-[10px] text-gray-400 font-mono font-medium mt-0.5">{t.ref}</p>
+                                    </td>
+                                    <td className="px-6 py-3.5 max-w-[220px]">
+                                        <p className="text-xs font-bold text-slate-800 leading-tight truncate">{t.note}</p>
+                                        <p className="text-[10px] text-gray-400 font-semibold mt-0.5 truncate">{t.memberName}</p>
+                                    </td>
+                                    <td className="px-6 py-3.5">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-xs font-semibold text-slate-700 truncate max-w-[120px]">{t.pocket}</span>
+                                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider self-start ${pocketTypeBadge[t.pocketType] || 'bg-slate-50 text-slate-500'}`}>
+                                                {t.pocketType}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-3.5">
+                                        <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full ${directionBadge(t.direction)}`}>
+                                            {t.direction === 'in' ? (
+                                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                                            ) : (
+                                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                            )}
+                                            {t.direction === 'in' ? 'Masuk' : 'Keluar'}
+                                        </span>
+                                    </td>
+                                    <td className={`px-6 py-3.5 text-xs font-extrabold text-right ${t.direction === 'in' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                        {t.direction === 'in' ? '+' : '-'}{idr(t.amount)}
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
+
+                {/* Load More Footer */}
+                {!loading && (
+                    <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
+                        <span className="text-[10px] font-semibold text-slate-400">
+                            Menampilkan {transactions.length} dari {total} transaksi
+                            {(searchQuery || dirFilter !== 'all' || pocketFilter !== 'all') && ` • ${filtered.length} setelah filter`}
+                        </span>
+                        {page < totalPages ? (
+                            <button
+                                onClick={handleLoadMore}
+                                disabled={loadingMore}
+                                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer disabled:opacity-50 shadow-sm"
+                            >
+                                {loadingMore ? (
+                                    <>
+                                        <svg className="animate-spin w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Memuat...
+                                    </>
+                                ) : (
+                                    <>
+                                        Muat 25 berikutnya
+                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                                            {Math.min(25, total - transactions.length)} lagi
+                                        </span>
+                                    </>
+                                )}
+                            </button>
+                        ) : total > 0 && (
+                            <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                Semua transaksi sudah dimuat
+                            </span>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

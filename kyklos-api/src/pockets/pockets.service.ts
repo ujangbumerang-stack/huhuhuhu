@@ -48,6 +48,31 @@ export class PocketsService {
     });
   }
 
+  async listCommunityTransactions(communityId: string, page = 1, limit = 25) {
+    this.logger.debug(`Listing community transactions page=${page} limit=${limit} for community ${communityId}`);
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: { communityId },
+        include: {
+          member: { select: { id: true, name: true, avatarUrl: true } },
+          pocket: { select: { id: true, name: true, type: true } },
+          createdBy: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.transaction.count({ where: { communityId } }),
+    ]);
+    return {
+      data: data.map(t => ({ ...t, amount: t.amount.toString() })),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async recordTransaction(pocketId: string, createdById: string, data: {
     amount: number; direction?: 'in' | 'out'; type?: 'in' | 'out'; category?: string; note?: string; description?: string; memberId?: string; status?: 'confirmed' | 'pending';
   }) {

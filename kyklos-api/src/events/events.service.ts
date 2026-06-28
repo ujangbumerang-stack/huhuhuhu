@@ -42,7 +42,7 @@ export class EventsService {
 
   create(communityId: string, createdById: string, data: any) {
     this.logger.log(`Creating event "${data.title}" in community ${communityId}`);
-    const { price, date, eventDate, ...rest } = data;
+    const { price, date, eventDate, isOnline, ...rest } = data;
     return this.prisma.event.create({
       data: {
         communityId, createdById, ...rest,
@@ -54,7 +54,7 @@ export class EventsService {
 
   update(id: string, data: any) {
     this.logger.log(`Updating event ${id}`);
-    const { price, date, eventDate, ...rest } = data;
+    const { price, date, eventDate, isOnline, ...rest } = data;
     return this.prisma.event.update({
       where: { id },
       data: {
