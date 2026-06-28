@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
@@ -10,6 +10,7 @@ interface Community {
     slug: string;
     themeColor: string;
     description?: string;
+    logoUrl?: string;
     memberships?: Array<{ role: string }>;
 }
 
@@ -24,9 +25,47 @@ export default function SelectorPage() {
         name: '',
         slug: '',
         description: '',
+        logoUrl: '',
         themeColor: '#0F3A4B',
     });
+    const [logoPreview, setLogoPreview] = useState('');
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const logoInputRef = useRef<HTMLInputElement>(null);
     const [submitting, setSubmitting] = useState(false);
+
+    const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Local preview immediately
+        const reader = new FileReader();
+        reader.onload = ev => setLogoPreview(ev.target?.result as string);
+        reader.readAsDataURL(file);
+
+        setUploadingLogo(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('folder', 'kyklos/logos');
+
+            const token = localStorage.getItem('kyklos_token');
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/upload`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+            });
+            const data = await res.json();
+            if (!data.url) throw new Error('Upload gagal');
+
+            setForm(f => ({ ...f, logoUrl: data.url }));
+            setLogoPreview('');
+        } catch (err: any) {
+            alert(err.message || 'Gagal mengupload logo komunitas.');
+            setLogoPreview('');
+        } finally {
+            setUploadingLogo(false);
+        }
+    };
 
     const handleNameChange = (val: string) => {
         const cleanSlug = val
@@ -46,7 +85,7 @@ export default function SelectorPage() {
             const list = await api.get<Community[]>('/communities');
             setCommunities(list || []);
             setShowCreateModal(false);
-            setForm({ name: '', slug: '', description: '', themeColor: '#0F3A4B' });
+            setForm({ name: '', slug: '', description: '', logoUrl: '', themeColor: '#0F3A4B' });
         } catch (err: any) {
             alert(err.message || 'Gagal membuat komunitas.');
         } finally {
@@ -123,12 +162,20 @@ export default function SelectorPage() {
                             className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 hover:shadow-lg hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between space-y-6 group h-full"
                         >
                             <div className="flex items-start justify-between">
-                                <div 
-                                    className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-xl shadow-inner group-hover:scale-105 transition-transform"
-                                    style={{ backgroundColor: c.themeColor || '#0B1E26' }}
-                                >
-                                    {c.name.charAt(0).toUpperCase()}
-                                </div>
+                                {c.logoUrl ? (
+                                    <img 
+                                        src={c.logoUrl} 
+                                        alt={c.name}
+                                        className="w-14 h-14 rounded-full object-cover shadow-inner border border-slate-100 group-hover:scale-105 transition-transform animate-fade-in"
+                                    />
+                                ) : (
+                                    <div 
+                                        className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-xl shadow-inner group-hover:scale-105 transition-transform"
+                                        style={{ backgroundColor: c.themeColor || '#0B1E26' }}
+                                    >
+                                        {c.name.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
                                 <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${role === 'admin' ? 'bg-[#0F3A4B]/10 text-[#0F3A4B]' : 'bg-slate-100 text-slate-500'}`}>
                                     {role === 'admin' ? 'Admin' : 'Member'}
                                 </span>
@@ -150,7 +197,7 @@ export default function SelectorPage() {
                     
                     <div 
                         onClick={() => setShowCreateModal(true)}
-                        className="bg-slate-50/50 border-2 border-dashed border-slate-300 rounded-2xl p-6 hover:bg-slate-100 hover:border-[#0F3A4B]/50 transition-all cursor-pointer flex flex-col items-center justify-center space-y-4 text-center min-h-[220px] group"
+                        className="bg-slate-50/50 border-2 border-dashed border-slate-350 rounded-2xl p-6 hover:bg-slate-100 hover:border-[#0F3A4B]/50 transition-all cursor-pointer flex flex-col items-center justify-center space-y-4 text-center min-h-[220px] group"
                     >
                         <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-slate-400 shadow-sm border border-slate-200 group-hover:text-[#0F3A4B] group-hover:border-[#0F3A4B]/30 transition-colors">
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -192,6 +239,51 @@ export default function SelectorPage() {
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* Logo Upload */}
+                            <div className="flex flex-col items-center justify-center py-2 select-none">
+                                <div className="relative">
+                                    <input
+                                        ref={logoInputRef}
+                                        type="file"
+                                        accept="image/png, image/jpeg, image/webp"
+                                        className="hidden"
+                                        onChange={handleLogoChange}
+                                    />
+                                    {(logoPreview || form.logoUrl) ? (
+                                        <img
+                                            src={logoPreview || form.logoUrl}
+                                            alt="Logo Komunitas Preview"
+                                            className="w-20 h-20 rounded-2xl object-cover border border-gray-250 shadow-sm"
+                                        />
+                                    ) : (
+                                        <div className="w-20 h-20 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 font-bold text-xs">
+                                            LOGO
+                                        </div>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => logoInputRef.current?.click()}
+                                        disabled={uploadingLogo}
+                                        className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-white border border-gray-250 shadow-sm flex items-center justify-center hover:bg-slate-50 cursor-pointer transition disabled:opacity-60"
+                                        title="Pilih logo"
+                                    >
+                                        {uploadingLogo ? (
+                                            <svg className="w-3.5 h-3.5 text-primary animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                        )}
+                                    </button>
+                                </div>
+                                {uploadingLogo && (
+                                    <p className="text-[9px] text-gray-400 font-semibold mt-1">Mengunggah logo...</p>
+                                )}
+                            </div>
+
                             <div className="space-y-1">
                                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Komunitas</label>
                                 <input
@@ -229,7 +321,7 @@ export default function SelectorPage() {
 
                             <div className="space-y-1">
                                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Warna Tema Branding</label>
-                                <div className="flex items-center gap-3 border border-slate-300 rounded-xl px-3.5 py-2.5">
+                                <div className="flex items-center gap-3 border border-slate-300 rounded-xl px-3.5 py-2.5 font-semibold">
                                     <input
                                         type="color"
                                         value={form.themeColor}

@@ -37,8 +37,14 @@ export default function SettingsPage() {
         clientKey: '',
     });
 
-    // States untuk Tema
+    // States untuk Tema & Identitas Komunitas
     const [selectedThemeColor, setSelectedThemeColor] = useState('#0F3A4B');
+    const [commName, setCommName] = useState('');
+    const [commDesc, setCommDesc] = useState('');
+    const [commLogoUrl, setCommLogoUrl] = useState('');
+    const [commLogoPreview, setCommLogoPreview] = useState('');
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const logoInputRef = useRef<HTMLInputElement>(null);
 
     // Avatar
     const [avatarUrl, setAvatarUrl] = useState<string>('');
@@ -82,6 +88,9 @@ export default function SettingsPage() {
             if (!c) return;
             setCommunityId(c.id);
             setSelectedThemeColor(c.themeColor);
+            setCommName(c.name || '');
+            setCommDesc(c.description || '');
+            setCommLogoUrl(c.logoUrl || '');
             
             // Set Form Profile fallback if empty
             if (!storedProfile) {
@@ -181,7 +190,43 @@ export default function SettingsPage() {
         }
     };
 
-    // Simpan Tema (Theme Color)
+    // Upload Logo Komunitas
+    const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Local preview immediately
+        const reader = new FileReader();
+        reader.onload = ev => setCommLogoPreview(ev.target?.result as string);
+        reader.readAsDataURL(file);
+
+        setUploadingLogo(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('folder', 'kyklos/logos');
+
+            const token = localStorage.getItem('kyklos_token');
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/upload`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+            });
+            const data = await res.json();
+            if (!data.url) throw new Error('Upload gagal');
+
+            setCommLogoUrl(data.url);
+            setCommLogoPreview('');
+        } catch (err: any) {
+            alert(err.message || 'Gagal mengupload logo komunitas.');
+            setCommLogoPreview('');
+        } finally {
+            setUploadingLogo(false);
+            if (logoInputRef.current) logoInputRef.current.value = '';
+        }
+    };
+
+    // Simpan Tema & Identitas Komunitas
     const handleSaveTheme = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -189,9 +234,17 @@ export default function SettingsPage() {
             // Update warna primer di tingkat DOM CSS Variables secara langsung
             document.documentElement.style.setProperty('--community-primary', selectedThemeColor);
             
-            // Update warna di API backend komunitas
-            await api.patch(`/communities/${communityId}`, { themeColor: selectedThemeColor });
+            // Update warna & identitas di API backend komunitas
+            await api.patch(`/communities/${communityId}`, { 
+                name: commName,
+                description: commDesc,
+                logoUrl: commLogoUrl,
+                themeColor: selectedThemeColor 
+            });
             
+            localStorage.setItem('kyklos_active_community_name', commName);
+            localStorage.setItem('kyklos_active_community_theme', selectedThemeColor);
+
             // Trigger event storage untuk memicu pembaruan sidebar layout
             const event = new Event('storage');
             window.dispatchEvent(event);
@@ -199,7 +252,7 @@ export default function SettingsPage() {
             setSavedTheme(true);
             setTimeout(() => setSavedTheme(false), 3000);
         } catch (err) {
-            console.error('Gagal menyimpan tema:', err);
+            console.error('Gagal menyimpan tema & identitas:', err);
         } finally {
             setLoading(false);
         }
@@ -256,7 +309,7 @@ export default function SettingsPage() {
                                 : 'text-slate-600 hover:bg-slate-50'
                         }`}
                     >
-                        Tema
+                        Identitas & Tema
                     </button>
                 </div>
 
@@ -314,7 +367,7 @@ export default function SettingsPage() {
                                 <svg className={`w-4.5 h-4.5 ${activeTab === 'theme' ? 'text-primary' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                                 </svg>
-                                <span>Tema</span>
+                                <span>Identitas & Tema</span>
                             </button>
                         </div>
                     </div>
@@ -587,37 +640,127 @@ export default function SettingsPage() {
                         </form>
                     )}
 
-                    {/* TAB: Tema (Theme Color) */}
+                    {/* TAB: Tema & Identitas Komunitas */}
                     {activeTab === 'theme' && (
                         <form onSubmit={handleSaveTheme} className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm space-y-6 animate-fade-in text-left">
                             <div className="border-b border-gray-100 pb-3 select-none">
-                                <h2 className="font-serif text-lg font-bold text-slate-800 tracking-tight">Kustomisasi Tema Komunitas</h2>
-                                <p className="text-[11px] text-gray-400 font-medium mt-0.5">Pilih warna dasar tema utama untuk merepresentasikan identitas komunitas Anda.</p>
+                                <h2 className="font-serif text-lg font-bold text-slate-800 tracking-tight">Identitas & Tema Komunitas</h2>
+                                <p className="text-[11px] text-gray-400 font-medium mt-0.5">Ubah nama, deskripsi, logo, serta warna dasar tema utama komunitas Anda.</p>
                             </div>
 
-                            {/* Color Swatch Options */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-2">
-                                {THEME_OPTIONS.map((theme) => {
-                                    const isSelected = selectedThemeColor === theme.color;
-                                    return (
-                                        <button
-                                            key={theme.color}
-                                            type="button"
-                                            onClick={() => setSelectedThemeColor(theme.color)}
-                                            className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all duration-200 text-left focus:outline-none cursor-pointer ${
-                                                isSelected 
-                                                    ? 'border-slate-800 bg-slate-50 ring-2 ring-slate-800/10' 
-                                                    : 'border-slate-200 hover:border-slate-350 bg-white'
-                                            }`}
-                                        >
-                                            <div 
-                                                className="w-5 h-5 rounded-full shadow-inner border border-black/5 flex-shrink-0"
-                                                style={{ backgroundColor: theme.color }}
-                                            />
-                                            <span className="text-xs font-bold text-slate-800 truncate">{theme.name}</span>
-                                        </button>
-                                    );
-                                })}
+                            {/* Community Logo Upload */}
+                            <div className="flex flex-col items-center justify-center py-2 select-none">
+                                <div className="relative">
+                                    <input
+                                        ref={logoInputRef}
+                                        type="file"
+                                        accept="image/png, image/jpeg, image/webp"
+                                        className="hidden"
+                                        onChange={handleLogoChange}
+                                    />
+                                    {(commLogoPreview || commLogoUrl) ? (
+                                        <img
+                                            src={commLogoPreview || commLogoUrl}
+                                            alt="Logo Komunitas"
+                                            className="w-24 h-24 rounded-2xl object-cover border border-gray-200 shadow-sm"
+                                        />
+                                    ) : (
+                                        <div className="w-24 h-24 rounded-2xl bg-slate-100 border-2 border-dashed border-slate-350 flex items-center justify-center text-slate-400 font-bold text-sm">
+                                            {commName ? commName[0].toUpperCase() : 'C'}
+                                        </div>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => logoInputRef.current?.click()}
+                                        disabled={uploadingLogo}
+                                        className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center hover:bg-slate-50 cursor-pointer transition disabled:opacity-60"
+                                        title="Ganti logo komunitas"
+                                    >
+                                        {uploadingLogo ? (
+                                            <svg className="w-4 h-4 text-primary animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        )}
+                                    </button>
+                                </div>
+                                {uploadingLogo && (
+                                    <p className="text-[10px] text-gray-400 font-semibold mt-2">Mengunggah logo...</p>
+                                )}
+                            </div>
+
+                            {/* Identity Fields */}
+                            <div className="space-y-4">
+                                <div className="relative border border-slate-300 rounded-xl px-3.5 py-2.5 bg-white">
+                                    <label className="bg-white px-1 absolute -top-2 left-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nama Komunitas</label>
+                                    <input 
+                                        type="text" required
+                                        value={commName}
+                                        onChange={e => setCommName(e.target.value)}
+                                        className="w-full text-sm font-semibold text-slate-900 focus:outline-none bg-transparent"
+                                    />
+                                </div>
+
+                                <div className="relative border border-slate-300 rounded-xl px-3.5 py-2.5 bg-white">
+                                    <label className="bg-white px-1 absolute -top-2 left-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Deskripsi Komunitas</label>
+                                    <textarea 
+                                        value={commDesc}
+                                        onChange={e => setCommDesc(e.target.value)}
+                                        rows={3}
+                                        className="w-full text-sm font-semibold text-slate-900 focus:outline-none bg-transparent resize-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Theme Color Picker */}
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">Pilihan Warna Tema</label>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                    {THEME_OPTIONS.map((theme) => {
+                                        const isSelected = selectedThemeColor === theme.color;
+                                        return (
+                                            <button
+                                                key={theme.color}
+                                                type="button"
+                                                onClick={() => setSelectedThemeColor(theme.color)}
+                                                className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all duration-200 text-left focus:outline-none cursor-pointer ${
+                                                    isSelected 
+                                                        ? 'border-slate-800 bg-slate-50 ring-2 ring-slate-800/10' 
+                                                        : 'border-slate-200 hover:border-slate-350 bg-white'
+                                                }`}
+                                            >
+                                                <div 
+                                                    className="w-5 h-5 rounded-full shadow-inner border border-black/5 flex-shrink-0"
+                                                    style={{ backgroundColor: theme.color }}
+                                                />
+                                                <span className="text-xs font-bold text-slate-800 truncate">{theme.name}</span>
+                                            </button>
+                                        );
+                                    })}
+
+                                    {/* Custom Color Option */}
+                                    <div className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all duration-200 text-left ${
+                                        !THEME_OPTIONS.some(t => t.color === selectedThemeColor)
+                                            ? 'border-slate-800 bg-slate-50 ring-2 ring-slate-800/10'
+                                            : 'border-slate-200 bg-white'
+                                    }`}>
+                                        <input 
+                                            type="color" 
+                                            value={selectedThemeColor} 
+                                            onChange={(e) => setSelectedThemeColor(e.target.value)}
+                                            className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent flex-shrink-0"
+                                        />
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase leading-none">Custom Color</span>
+                                            <span className="text-[10px] font-mono font-bold text-slate-800 mt-1 uppercase truncate">{selectedThemeColor}</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Submit Button */}
@@ -635,12 +778,12 @@ export default function SettingsPage() {
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                             </svg>
-                                            Tema Berhasil Diperbarui
+                                            Identitas & Tema Berhasil Diperbarui
                                         </span>
                                     ) : loading ? (
                                         'Memproses Perubahan...'
                                     ) : (
-                                        'Simpan & Terapkan Tema'
+                                        'Simpan & Terapkan Perubahan'
                                     )}
                                 </button>
                             </div>

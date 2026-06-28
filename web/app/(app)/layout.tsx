@@ -47,11 +47,18 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
                     setProfileForm(JSON.parse(storedProfile));
                 } catch {}
             }
+            api.get<any[]>('/communities').then(list => {
+                const c = list.find(x => x.slug === slug) || list[0];
+                if (c) {
+                    setCommunity(c);
+                    document.documentElement.style.setProperty('--community-primary', c.themeColor);
+                }
+            }).catch(() => {});
         };
 
         window.addEventListener('storage', handleStorageChange);
         return () => window.removeEventListener('storage', handleStorageChange);
-    }, []);
+    }, [slug]);
 
     useEffect(() => {
         const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
@@ -190,8 +197,22 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
             {/* Top Navbar Utama (Sesuai dengan tangkapan layar) */}
             <header className="hidden md:flex h-14 bg-white border-b border-gray-200/70 items-center justify-between px-6 flex-shrink-0 select-none">
                 {/* Kiri: Kyklos Logo */}
-                <Link href="/dashboard" className="flex items-center">
-                    <span className="font-serif font-black text-2xl text-primary tracking-tight">{community.name}</span>
+                <Link href="/dashboard" className="flex items-center gap-2.5">
+                    {community.logoUrl ? (
+                        <img 
+                            src={community.logoUrl} 
+                            alt={community.name}
+                            className="w-8.5 h-8.5 rounded-lg object-cover border border-slate-100 shadow-sm"
+                        />
+                    ) : (
+                        <div 
+                            className="w-8.5 h-8.5 rounded-lg flex items-center justify-center text-white font-black text-sm shadow-inner"
+                            style={{ backgroundColor: community.themeColor || '#0B1E26' }}
+                        >
+                            {community.name.charAt(0).toUpperCase()}
+                        </div>
+                    )}
+                    <span className="font-serif font-black text-xl text-primary tracking-tight leading-none">{community.name}</span>
                 </Link>
 
                 {/* Kanan: Profil User dengan Popover */}
@@ -347,11 +368,27 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
                     {/* Header Seluler (md-hidden) - Menampilkan navigasi tab atas seperti sebelumnya */}
                     <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm md:hidden flex-shrink-0">
                         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-                            <div className="min-w-0">
-                                <span className="font-serif font-black text-slate-900 text-[13px] block tracking-tight truncate leading-none">{community.name}</span>
-                                <span className={`inline-block mt-1 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${userRole === 'admin' ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-500'}`}>
-                                    {userRole === 'admin' ? 'Admin' : 'Member'}
-                                </span>
+                            <div className="flex items-center gap-2 min-w-0">
+                                {community.logoUrl ? (
+                                    <img 
+                                        src={community.logoUrl} 
+                                        alt={community.name}
+                                        className="w-7.5 h-7.5 rounded-lg object-cover border border-slate-100 shadow-sm flex-shrink-0"
+                                    />
+                                ) : (
+                                    <div 
+                                        className="w-7.5 h-7.5 rounded-lg flex items-center justify-center text-white font-black text-xs shadow-inner flex-shrink-0"
+                                        style={{ backgroundColor: community.themeColor || '#0B1E26' }}
+                                    >
+                                        {community.name.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                                <div className="min-w-0">
+                                    <span className="font-serif font-black text-slate-900 text-[13px] block tracking-tight truncate leading-none">{community.name}</span>
+                                    <span className={`inline-block mt-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${userRole === 'admin' ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-500'}`}>
+                                        {userRole === 'admin' ? 'Admin' : 'Member'}
+                                    </span>
+                                </div>
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="relative">
