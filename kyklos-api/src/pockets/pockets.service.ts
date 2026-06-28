@@ -49,12 +49,18 @@ export class PocketsService {
   }
 
   async recordTransaction(pocketId: string, createdById: string, data: {
-    amount: number; direction: 'in' | 'out'; category?: string; note?: string; memberId?: string; status?: 'confirmed' | 'pending';
+    amount: number; direction?: 'in' | 'out'; type?: 'in' | 'out'; category?: string; note?: string; description?: string; memberId?: string; status?: 'confirmed' | 'pending';
   }) {
     const pocket = await this.findOne(pocketId);
-    this.logger.log(`Recording transaction: pocket=${pocketId} amount=${data.amount} dir=${data.direction} by=${createdById}`);
+    const direction = data.direction || data.type;
+    if (!direction) {
+      throw new BadRequestException('Transaction direction or type is required');
+    }
+    const note = data.note || data.description;
+
+    this.logger.log(`Recording transaction: pocket=${pocketId} amount=${data.amount} dir=${direction} by=${createdById}`);
     
-    const balanceChange = data.direction === 'in' ? BigInt(data.amount) : -BigInt(data.amount);
+    const balanceChange = direction === 'in' ? BigInt(data.amount) : -BigInt(data.amount);
 
     const [txn] = await this.prisma.$transaction([
       this.prisma.transaction.create({
@@ -63,9 +69,9 @@ export class PocketsService {
           communityId: pocket.communityId,
           createdById,
           amount: BigInt(data.amount),
-          direction: data.direction,
+          direction: direction as any,
           category: data.category,
-          note: data.note,
+          note: note,
           memberId: data.memberId,
           status: data.status ?? 'confirmed',
         },
