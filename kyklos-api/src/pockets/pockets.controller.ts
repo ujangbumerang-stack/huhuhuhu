@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { PocketsService } from './pockets.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -88,5 +88,15 @@ export class PocketsController {
   @UseGuards(AdminGuard)
   approveWithdrawal(@Param('communityId') communityId: string, @Param('id') id: string, @Request() req: any) {
     return this.svc.approveWithdrawal(communityId, id, req.user.id);
+  }
+
+  @Patch('pockets/:id')
+  async update(@Param('id') id: string, @Request() req: any, @Body() body: any) {
+    const pocket = await this.svc.findOne(id);
+    const m = await this.prisma.membership.findUnique({
+      where: { communityId_userId: { communityId: pocket.communityId, userId: req.user.id } },
+    });
+    if (!m || m.role !== 'admin') throw new Error('Admin access required');
+    return this.svc.update(id, body);
   }
 }

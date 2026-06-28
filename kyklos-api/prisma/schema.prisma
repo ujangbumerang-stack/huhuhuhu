@@ -154,6 +154,8 @@ model Pocket {
   description        String?
   type               PocketType          @default(KAS)
   balance            BigInt              @default(0)
+  vaNumber           String?             @map("va_number")
+  vaName             String?             @map("va_name")
   createdAt          DateTime            @default(now()) @map("created_at")
   arisanParticipants ArisanParticipant[]
   arisanPeriods      ArisanPeriod[]

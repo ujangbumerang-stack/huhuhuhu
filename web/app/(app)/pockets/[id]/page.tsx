@@ -13,6 +13,8 @@ interface Pocket {
     balance: number;
     status: string;
     targetAmount?: number;
+    vaNumber?: string;
+    vaName?: string;
 }
 
 const idr = (val: any) => {
@@ -46,7 +48,18 @@ export default function PocketDetailPage() {
     });
     const [activeTab, setActiveTab] = useState<'deposit' | 'expense' | 'disburse'>('deposit');
 
+    // Pocket Settings states
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editForm, setEditForm] = useState({
+        name: '',
+        description: '',
+        vaNumber: '',
+        vaName: ''
+    });
+    const [updatingPocket, setUpdatingPocket] = useState(false);
+
     const getPocketVA = (p: Pocket) => {
+        if (p.vaNumber) return p.vaNumber;
         let hash = 0;
         for (let i = 0; i < p.id.length; i++) {
             hash = p.id.charCodeAt(i) + ((hash << 5) - hash);
@@ -55,7 +68,8 @@ export default function PocketDetailPage() {
         return `8802-${val.slice(0, 4)}-${val.slice(4, 8)}`;
     };
 
-    const getPocketVAName = (cName: string, pName: string) => {
+    const getPocketVAName = (cName: string, pName: string, p?: Pocket | null) => {
+        if (p?.vaName) return p.vaName;
         const cleanCommunity = cName.slice(0, 15).toUpperCase();
         const cleanPocket = pName.slice(0, 10).toUpperCase();
         return `KYK*${cleanCommunity}*${cleanPocket}`;
@@ -93,6 +107,28 @@ export default function PocketDetailPage() {
         } finally {
             setLoading(false);
             setLoadingTxns(false);
+        }
+    };
+
+    const handleEditSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editForm.name.trim()) return;
+        setUpdatingPocket(true);
+        try {
+            await api.patch(`/pockets/${pocketId}`, {
+                name: editForm.name,
+                description: editForm.description,
+                vaNumber: editForm.vaNumber || null,
+                vaName: editForm.vaName || null
+            });
+            setShowEditModal(false);
+            // Reload pocket detail
+            const updatedPocket = await api.get<Pocket>(`/pockets/${pocketId}`);
+            setPocket(updatedPocket);
+        } catch (err: any) {
+            alert(err.message || 'Gagal mengubah pengaturan kantong.');
+        } finally {
+            setUpdatingPocket(false);
         }
     };
 
@@ -266,6 +302,26 @@ export default function PocketDetailPage() {
                     </div>
                     <p className="text-xs text-gray-400 font-semibold">{pocket.description || 'Tidak ada deskripsi untuk kantong ini.'}</p>
                 </div>
+                {role === 'admin' && (
+                    <button 
+                        onClick={() => {
+                            setEditForm({
+                                name: pocket.name,
+                                description: pocket.description || '',
+                                vaNumber: pocket.vaNumber || '',
+                                vaName: pocket.vaName || ''
+                            });
+                            setShowEditModal(true);
+                        }}
+                        className="px-3.5 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-2 shadow-sm hover:shadow-md transition cursor-pointer select-none self-start sm:self-center"
+                    >
+                        <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Edit Pengaturan Kantong
+                    </button>
+                )}
             </div>
 
             {/* ── Grid Layout ── */}
@@ -330,7 +386,7 @@ export default function PocketDetailPage() {
                             <div className="relative z-10 bg-black/15 border border-white/10 rounded-xl px-3 py-2.5 text-[10px] text-white/80 space-y-0.5">
                                 <p className="font-bold text-white/40 uppercase tracking-widest text-[7.5px]">Virtual Account Nobu (Whitelabel)</p>
                                 <p className="font-mono font-bold tracking-wider text-xs text-white">{getPocketVA(pocket)}</p>
-                                <p className="truncate text-white/50 text-[8.5px] font-semibold">{getPocketVAName(communityName, pocket.name)}</p>
+                                <p className="truncate text-white/50 text-[8.5px] font-semibold">{getPocketVAName(communityName, pocket.name, pocket)}</p>
                             </div>
                         </div>
                     </div>
@@ -341,7 +397,7 @@ export default function PocketDetailPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="font-mono text-sm font-black text-slate-800 tracking-wider">{getPocketVA(pocket)}</p>
-                                <p className="text-[10px] font-bold text-slate-500 mt-0.5">{getPocketVAName(communityName, pocket.name)}</p>
+                                <p className="text-[10px] font-bold text-slate-500 mt-0.5">{getPocketVAName(communityName, pocket.name, pocket)}</p>
                             </div>
                             <span className="text-[9px] font-extrabold px-2 py-0.5 bg-sky-50 text-sky-700 rounded border border-sky-100 uppercase tracking-wider">Nobu Route</span>
                         </div>
@@ -395,7 +451,7 @@ export default function PocketDetailPage() {
                                 <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 text-xs text-slate-600 space-y-1">
                                     <p className="font-bold text-slate-400 uppercase tracking-wider text-[8px]">Tujuan Transfer Virtual Account (Whitelabel Nobu):</p>
                                     <p className="font-mono font-bold text-slate-800 text-sm tracking-wider">{getPocketVA(pocket)}</p>
-                                    <p className="font-semibold text-slate-700 text-[10px]">{getPocketVAName(communityName, pocket.name)}</p>
+                                    <p className="font-semibold text-slate-700 text-[10px]">{getPocketVAName(communityName, pocket.name, pocket)}</p>
                                 </div>
                             )}
 
@@ -525,6 +581,106 @@ export default function PocketDetailPage() {
                 </div>
 
             </div>
+
+            {/* Modal Edit Pocket */}
+            {showEditModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-300 animate-fadeIn">
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl max-w-md w-full overflow-hidden flex flex-col transform transition-all scale-100">
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <h3 className="font-serif text-lg font-black text-slate-800 tracking-tight">Pengaturan Kantong</h3>
+                                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Sesuaikan Informasi & Virtual Account</p>
+                            </div>
+                            <button 
+                                onClick={() => setShowEditModal(false)}
+                                className="w-8 h-8 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Form */}
+                        <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+                            <div className="space-y-1">
+                                <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Nama Kantong</label>
+                                <input
+                                    type="text" required
+                                    value={editForm.name}
+                                    onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                    placeholder="Masukkan nama kantong"
+                                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-primary text-slate-800 font-semibold"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Deskripsi Kantong</label>
+                                <textarea
+                                    rows={2}
+                                    value={editForm.description}
+                                    onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                                    placeholder="Masukkan deskripsi kegunaan kantong"
+                                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-primary text-slate-800 font-medium resize-none"
+                                />
+                            </div>
+
+                            <div className="border-t border-slate-100 my-4 pt-4 space-y-3">
+                                <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Auto-Routing Virtual Account (Nobu)</h4>
+                                
+                                <div className="space-y-1">
+                                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Kustom Nomor VA (Whitelabel)</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.vaNumber}
+                                        onChange={e => setEditForm({ ...editForm, vaNumber: e.target.value })}
+                                        placeholder="Contoh: 8802-5031-2099"
+                                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-primary text-slate-800 font-mono font-semibold"
+                                    />
+                                    <p className="text-[9px] text-slate-400 font-medium mt-0.5">Biarkan kosong untuk menggunakan nomor routing acak bawaan.</p>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Kustom Nama VA (Whitelabel)</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.vaName}
+                                        onChange={e => setEditForm({ ...editForm, vaName: e.target.value })}
+                                        placeholder="Contoh: KYK*ANJU*KAS ANJAY"
+                                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-primary text-slate-800 font-semibold"
+                                    />
+                                    <p className="text-[9px] text-slate-400 font-medium mt-0.5">Biarkan kosong untuk menggunakan nama default `KYK*NAMA_KOMUNITAS*NAMA_KANTONG`.</p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setShowEditModal(false)}
+                                    className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 rounded-xl font-bold text-xs text-slate-500 transition cursor-pointer text-center"
+                                >
+                                    Batal
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={updatingPocket}
+                                    className="flex-1 py-2.5 bg-primary text-white rounded-xl font-bold text-xs hover:brightness-95 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                                >
+                                    {updatingPocket ? (
+                                        <>
+                                            <div className="animate-spin h-3.5 w-3.5 text-white border-2 border-white/20 border-t-white rounded-full" />
+                                            <span>Menyimpan...</span>
+                                        </>
+                                    ) : (
+                                        <span>Simpan Pengaturan</span>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
