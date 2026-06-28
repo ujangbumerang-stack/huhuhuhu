@@ -29,11 +29,12 @@ export default function ContributionsPage() {
     const [communityId, setCommunityId] = useState('');
     const [dues, setDues] = useState<Due[]>([]);
     const [contributions, setContributions] = useState<Contribution[]>([]);
+    const [pockets, setPockets] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [showNewDueModal, setShowNewDueModal] = useState(false);
     const [newDueForm, setNewDueForm] = useState({
-        title: '', amount: '', dueDate: '', frequency: 'monthly', isMandatory: true
+        title: '', amount: '', dueDate: '', frequency: 'monthly', isMandatory: true, pocketId: ''
     });
 
     useEffect(() => {
@@ -54,8 +55,13 @@ export default function ContributionsPage() {
 
             const fetchedDues = await api.get<Due[]>(`/communities/${c.id}/dues`);
             const fetchedContribs = await api.get<Contribution[]>(`/communities/${c.id}/contributions`);
+            const fetchedPockets = await api.get<any[]>(`/communities/${c.id}/pockets`);
             setDues(fetchedDues || []);
             setContributions(fetchedContribs || []);
+            setPockets(fetchedPockets || []);
+            if (fetchedPockets && fetchedPockets.length > 0) {
+                setNewDueForm(prev => ({ ...prev, pocketId: fetchedPockets[0].id }));
+            }
         } catch (err) {
             console.error('Failed to load contributions', err);
         } finally {
@@ -69,16 +75,21 @@ export default function ContributionsPage() {
 
     const handleCreateDue = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!newDueForm.pocketId) {
+            alert('Pilih kantong tujuan terlebih dahulu');
+            return;
+        }
         try {
             await api.post(`/communities/${communityId}/dues`, {
                 title: newDueForm.title,
                 amount: parseFloat(newDueForm.amount),
+                pocketId: newDueForm.pocketId,
                 dueDate: newDueForm.dueDate || new Date().toISOString(),
                 frequency: newDueForm.frequency,
                 isMandatory: newDueForm.isMandatory
             });
             setShowNewDueModal(false);
-            setNewDueForm({ title: '', amount: '', dueDate: '', frequency: 'monthly', isMandatory: true });
+            setNewDueForm({ title: '', amount: '', dueDate: '', frequency: 'monthly', isMandatory: true, pocketId: pockets[0]?.id || '' });
             loadData();
         } catch (err: any) {
             alert(err.message || 'Gagal membuat tagihan iuran');
@@ -180,15 +191,16 @@ export default function ContributionsPage() {
                                     </td>
                                     <td className="px-6 py-3.5">
                                         <span className={`inline-flex items-center gap-1.5 text-[9px] font-bold px-2 py-0.5 rounded ${
-                                            c.status === 'verified' ? 'bg-sky-50 text-sky-700' :
                                             c.status === 'paid' ? 'bg-emerald-50 text-emerald-700' :
+                                            c.status === 'pending_verify' ? 'bg-amber-50 text-amber-700' :
+                                            c.status === 'unpaid' ? 'bg-rose-50 text-rose-600' :
                                             'bg-orange-50 text-orange-600'
                                         }`}>
-                                            {c.status.toUpperCase()}
+                                            {c.status === 'pending_verify' ? 'PENDING VERIFY' : c.status.toUpperCase()}
                                         </span>
                                     </td>
                                     <td className="px-6 py-3.5 text-right">
-                                        {(c.status === 'paid' || c.status === 'pending') && (
+                                        {c.status === 'pending_verify' && (
                                             <button 
                                                 onClick={() => handleVerify(c.id)}
                                                 className="px-3 py-1.5 border border-[#0284C7]/20 rounded-lg text-[10px] font-semibold text-[#0284C7] hover:bg-sky-50 transition cursor-pointer"
@@ -228,6 +240,17 @@ export default function ContributionsPage() {
                             <option value="monthly">Monthly</option>
                             <option value="yearly">Yearly</option>
                             <option value="one-time">One-Time</option>
+                        </select>
+                        <select
+                            value={newDueForm.pocketId}
+                            onChange={e => setNewDueForm({ ...newDueForm, pocketId: e.target.value })}
+                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
+                            required
+                        >
+                            <option value="" disabled>Select Target Pocket</option>
+                            {pockets.map(p => (
+                                <option key={p.id} value={p.id}>{p.name} (Saldo: {idr(Number(p.balance))})</option>
+                            ))}
                         </select>
                         <div className="flex gap-2 pt-2">
                             <button type="button" onClick={() => setShowNewDueModal(false)} className="flex-1 py-2 bg-gray-100 rounded-xl font-bold text-sm">Cancel</button>
