@@ -272,8 +272,8 @@ export default function SettingsPage() {
         <div className="space-y-6 max-w-5xl">
             {/* Header Settings */}
             <div className="space-y-1 select-none">
-                <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Settings</h1>
-                <p className="text-xs sm:text-sm text-gray-400 font-semibold">Manage your profile, payment gateways, and design aesthetics.</p>
+                <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Pengaturan</h1>
+                <p className="text-xs sm:text-sm text-gray-400 font-semibold">Kelola profil, rekening pembayaran, dan tampilan komunitas Anda.</p>
             </div>
 
             {/* Grid Konten Settings */}
@@ -289,7 +289,7 @@ export default function SettingsPage() {
                                 : 'text-slate-600 hover:bg-slate-50'
                         }`}
                     >
-                        Edit Profile
+                        Edit Profil
                     </button>
                     <button
                         onClick={() => setActiveTab('bank')}
@@ -299,7 +299,7 @@ export default function SettingsPage() {
                                 : 'text-slate-600 hover:bg-slate-50'
                         }`}
                     >
-                        Bank Account
+                        Rekening Bank
                     </button>
                     <button
                         onClick={() => setActiveTab('theme')}
@@ -317,7 +317,7 @@ export default function SettingsPage() {
                 <aside className="hidden lg:flex lg:col-span-4 flex-col space-y-6 select-none">
                     {/* Kelompok Account */}
                     <div className="space-y-3">
-                        <h3 className="text-xs font-bold text-slate-900 tracking-wider uppercase">Account</h3>
+                        <h3 className="text-xs font-bold text-slate-900 tracking-wider uppercase">Akun</h3>
                         <div className="flex flex-col gap-1.5">
                             {/* Tombol Edit Profile */}
                             <button
@@ -331,7 +331,7 @@ export default function SettingsPage() {
                                 <svg className={`w-4.5 h-4.5 ${activeTab === 'profile' ? 'text-primary' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-2.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                 </svg>
-                                <span>Edit Profile</span>
+                                <span>Edit Profil</span>
                             </button>
 
                             {/* Tombol Bank Account */}
@@ -346,7 +346,7 @@ export default function SettingsPage() {
                                 <svg className={`w-4.5 h-4.5 ${activeTab === 'bank' ? 'text-primary' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                 </svg>
-                                <span>Bank Account</span>
+                                <span>Rekening Bank</span>
                             </button>
                         </div>
                     </div>
@@ -380,7 +380,7 @@ export default function SettingsPage() {
                     {activeTab === 'profile' && (
                         <form onSubmit={handleSaveProfile} className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm space-y-6 animate-fade-in text-left">
                             <div className="border-b border-gray-100 pb-3 select-none">
-                                <h2 className="font-serif text-lg font-bold text-slate-800 tracking-tight">Edit Profile</h2>
+                                <h2 className="font-serif text-lg font-bold text-slate-800 tracking-tight">Edit Profil</h2>
                                 <p className="text-[11px] text-gray-400 font-medium mt-0.5">Ubah avatar, username, nama lengkap, dan data diri Anda.</p>
                             </div>
 
@@ -448,7 +448,7 @@ export default function SettingsPage() {
 
                                 {/* Name */}
                                 <div className="relative border border-slate-300 rounded-xl px-3.5 py-2.5 bg-white">
-                                    <label className="bg-white px-1 absolute -top-2 left-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Name</label>
+                                    <label className="bg-white px-1 absolute -top-2 left-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nama</label>
                                     <input 
                                         type="text" 
                                         value={profileForm.name}
@@ -470,7 +470,7 @@ export default function SettingsPage() {
 
                                 {/* Phone */}
                                 <div className="relative border border-slate-300 rounded-xl px-3.5 py-2.5 flex items-center justify-between bg-white">
-                                    <label className="bg-white px-1 absolute -top-2 left-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Phone</label>
+                                    <label className="bg-white px-1 absolute -top-2 left-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">No. Telepon</label>
                                     <input 
                                         type="text" 
                                         value={profileForm.phone}
@@ -479,7 +479,7 @@ export default function SettingsPage() {
                                     />
                                     {profileForm.phone === 'Not added' && (
                                         <button type="button" onClick={() => alert('Fitur verifikasi telepon sedang dikembangkan.')} className="text-xs font-bold text-primary hover:underline cursor-pointer select-none">
-                                            Verify
+                                            Verifikasi
                                         </button>
                                     )}
                                 </div>
@@ -496,12 +496,12 @@ export default function SettingsPage() {
                                                 }
                                             }}
                                             rows={3}
-                                            placeholder="Tell people about yourself"
+                                            placeholder="Ceritakan sedikit tentang diri Anda"
                                             className="w-full text-sm font-semibold text-slate-900 focus:outline-none bg-transparent resize-none placeholder:text-slate-400 placeholder:font-normal"
                                         />
                                     </div>
                                     <p className="text-[10px] text-right text-gray-400 font-semibold select-none">
-                                        {profileForm.bio.length}/250 characters
+                                        {profileForm.bio.length}/250 karakter
                                     </p>
                                 </div>
                             </div>
@@ -515,7 +515,7 @@ export default function SettingsPage() {
                                         savedProfile ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''
                                     }`}
                                 >
-                                    {savedProfile ? 'Saved' : 'Save'}
+                                    {savedProfile ? 'Tersimpan' : 'Simpan'}
                                 </button>
                             </div>
                         </form>
@@ -525,7 +525,7 @@ export default function SettingsPage() {
                     {activeTab === 'bank' && (
                         <form onSubmit={handleSaveBank} className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm space-y-6 animate-fade-in text-left">
                             <div className="border-b border-gray-100 pb-3 select-none">
-                                <h2 className="font-serif text-lg font-bold text-slate-800 tracking-tight">Bank Account Settings</h2>
+                                <h2 className="font-serif text-lg font-bold text-slate-800 tracking-tight">Pengaturan Rekening Bank</h2>
                                 <p className="text-[11px] text-gray-400 font-medium mt-0.5">Atur detail rekening bank untuk menerima pembayaran iuran warga.</p>
                             </div>
 
@@ -756,7 +756,7 @@ export default function SettingsPage() {
                                             className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent flex-shrink-0"
                                         />
                                         <div className="flex flex-col min-w-0">
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase leading-none">Custom Color</span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase leading-none">Warna Kustom</span>
                                             <span className="text-[10px] font-mono font-bold text-slate-800 mt-1 uppercase truncate">{selectedThemeColor}</span>
                                         </div>
                                     </div>

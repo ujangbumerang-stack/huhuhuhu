@@ -24,7 +24,6 @@ interface Membership {
 }
 
 export default function MembersPage() {
-    const [slug, setSlug] = useState('keluarga-cemara');
     const router = useRouter();
     const [members, setMembers] = useState<Membership[]>([]);
     const [communityId, setCommunityId] = useState<string>('');
@@ -37,38 +36,28 @@ export default function MembersPage() {
 
     const { role: currentUserRole } = useContext(CommunityContext);
 
-    const [inviteForm, setInviteForm] = useState({
-        email: '',
-        role: 'member',
-    });
+    const [inviteForm, setInviteForm] = useState({ email: '', role: 'member' });
 
-    useEffect(() => {
-        const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
-        setSlug(activeSlug);
-    }, []);
-
-    const loadMembers = () => {
+    const loadMembers = async () => {
         setLoading(true);
-        api.get<any[]>('/communities').then(list => {
-            const c = list.find(x => x.slug === slug) || list[0];
-            if (!c) {
-                router.push('/login');
-                return;
-            }
+        try {
+            const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
+            const list = await api.get<any[]>('/communities');
+            const c = list.find(x => x.slug === activeSlug) || list[0];
+            if (!c) { router.push('/login'); return; }
             setCommunityId(c.id);
-            return api.get<Membership[]>(`/communities/${c.id}/members`);
-        }).then(res => {
+            const res = await api.get<Membership[]>(`/communities/${c.id}/members`);
             if (res) setMembers(res);
-            setLoading(false);
-        }).catch(err => {
+        } catch (err) {
             console.error('Failed to load members', err);
+        } finally {
             setLoading(false);
-        });
+        }
     };
 
     useEffect(() => {
         loadMembers();
-    }, [slug, router]);
+    }, []);
 
     const handleInviteSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -84,7 +73,7 @@ export default function MembersPage() {
             setInviteForm({ email: '', role: 'member' });
             loadMembers();
         } catch (err: any) {
-            setErrorMsg(err.message || 'Failed to add member. Ensure the user is registered.');
+            setErrorMsg(err.message || 'Gagal menambahkan anggota. Pastikan pengguna sudah terdaftar.');
         }
     };
 
@@ -94,7 +83,7 @@ export default function MembersPage() {
             setActiveMenuId(null);
             loadMembers();
         } catch (err: any) {
-            alert(err.message || 'Failed to remove member');
+            alert(err.message || 'Gagal menghapus anggota');
         }
     };
 
@@ -116,10 +105,10 @@ export default function MembersPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
                     <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">
-                        Members Directory
+                        Direktori Anggota
                     </h1>
                     <p className="text-xs sm:text-sm text-gray-400 font-semibold">
-                        Manage community residents, roles, and dues compliance.
+                        Kelola anggota komunitas, peran, dan kepatuhan iuran.
                     </p>
                 </div>
 
@@ -132,7 +121,7 @@ export default function MembersPage() {
                             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                             </svg>
-                            Invite Member
+                            Undang Anggota
                         </button>
                     )}
                 </div>
@@ -150,7 +139,7 @@ export default function MembersPage() {
                         type="text" 
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="Search members by name or email..."
+                        placeholder="Cari anggota berdasarkan nama atau email..."
                         className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-primary bg-white text-slate-900 placeholder:text-slate-500 transition"
                     />
                 </div>
@@ -162,15 +151,15 @@ export default function MembersPage() {
                             activeFilter === 'All' ? 'bg-[#E0F2FE]/50 text-[#0284C7]' : 'text-gray-500 hover:text-gray-800'
                         }`}
                     >
-                        All Residents
+                        Semua Anggota
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveFilter('Committee')}
                         className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                             activeFilter === 'Committee' ? 'bg-[#E0F2FE]/50 text-[#0284C7]' : 'text-gray-500 hover:text-gray-800'
                         }`}
                     >
-                        Committee (Admin)
+                        Pengurus (Admin)
                     </button>
                 </div>
             </div>
@@ -181,15 +170,15 @@ export default function MembersPage() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-gray-100 bg-gray-50/50 text-[10px] font-bold text-gray-400 uppercase tracking-wider select-none">
-                                <th className="px-6 py-4">Resident</th>
-                                <th className="px-6 py-4">Role</th>
+                                <th className="px-6 py-4">Anggota</th>
+                                <th className="px-6 py-4">Peran</th>
                                 <th className="px-6 py-4">Status</th>
-                                {currentUserRole === 'admin' && <th className="px-6 py-4 text-center">Actions</th>}
+                                {currentUserRole === 'admin' && <th className="px-6 py-4 text-center">Aksi</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {loading ? (
-                                <tr><td colSpan={4} className="px-6 py-10 text-center text-xs text-gray-400">Loading...</td></tr>
+                                <tr><td colSpan={4} className="px-6 py-10 text-center text-xs text-gray-400">Memuat...</td></tr>
                             ) : filteredMembers.length === 0 ? (
                                 <tr>
                                     <td colSpan={4} className="px-6 py-10 text-center text-xs text-gray-400 font-medium">
@@ -199,7 +188,7 @@ export default function MembersPage() {
                             ) : (
                                 filteredMembers.map((m) => {
                                     const isActive = m.status === 'active';
-                                    const roleStr = m.role === 'admin' ? 'Admin / Committee' : 'Member';
+                                    const roleStr = m.role === 'admin' ? 'Admin / Pengurus' : 'Anggota';
 
                                     return (
                                         <tr key={m.id} className="hover:bg-gray-50/30 transition duration-150 relative">
@@ -316,8 +305,8 @@ export default function MembersPage() {
                                 onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })}
                                 className="w-full border border-slate-300 bg-white rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none focus:border-primary text-slate-900 placeholder:text-slate-500"
                             >
-                                <option value="member">Resident / Member</option>
-                                <option value="admin">Committee / Admin</option>
+                                <option value="member">Anggota Biasa</option>
+                                <option value="admin">Pengurus / Admin</option>
                             </select>
                         </div>
                         <div className="flex items-center gap-3 pt-2">

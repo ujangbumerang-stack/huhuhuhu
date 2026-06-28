@@ -18,7 +18,6 @@ interface Event {
 
 export default function EventsPage() {
     const router = useRouter();
-    const [slug, setSlug] = useState('keluarga-cemara');
     const [communityId, setCommunityId] = useState('');
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
@@ -30,22 +29,14 @@ export default function EventsPage() {
         title: '', description: '', date: '', location: '', isOnline: false, imageUrl: ''
     });
 
-    useEffect(() => {
-        const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
-        setSlug(activeSlug);
-    }, []);
-
     const loadData = async () => {
         setLoading(true);
         try {
+            const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
             const list = await api.get<any[]>('/communities');
-            const c = list.find(x => x.slug === slug) || list[0];
-            if (!c) {
-                router.push('/login');
-                return;
-            }
+            const c = list.find(x => x.slug === activeSlug) || list[0];
+            if (!c) { router.push('/login'); return; }
             setCommunityId(c.id);
-
             const fetchedEvents = await api.get<Event[]>(`/communities/${c.id}/events`);
             setEvents(fetchedEvents || []);
         } catch (err) {
@@ -57,7 +48,7 @@ export default function EventsPage() {
 
     useEffect(() => {
         loadData();
-    }, [slug, router]);
+    }, []);
 
     const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -105,20 +96,20 @@ export default function EventsPage() {
         <div className="space-y-6 relative">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Community Events</h1>
-                    <p className="text-xs sm:text-sm text-gray-400 font-semibold">Discover and manage community gatherings, meetups, and events.</p>
+                    <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Agenda Komunitas</h1>
+                    <p className="text-xs sm:text-sm text-gray-400 font-semibold">Temukan dan kelola pertemuan, kopdar, serta acara komunitas.</p>
                 </div>
 
                 <button 
                     onClick={() => setShowNewEventModal(true)}
                     className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-90 hover:shadow-md transition shadow-sm cursor-pointer"
                 >
-                    Create New Event
+                    Buat Acara Baru
                 </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-                {loading && <div className="col-span-full py-8 text-center text-xs text-gray-400">Loading events...</div>}
+                {loading && <div className="col-span-full py-8 text-center text-xs text-gray-400">Memuat agenda...</div>}
                 
                 {!loading && events.length === 0 && (
                     <div className="col-span-full py-8 text-center text-gray-400 text-sm">
@@ -161,19 +152,19 @@ export default function EventsPage() {
                                     onClick={() => handleRsvp(ev.id, 'going')}
                                     className="flex-1 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-bold hover:bg-emerald-100 transition cursor-pointer"
                                 >
-                                    Going
+                                    Hadir
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => handleRsvp(ev.id, 'maybe')}
                                     className="flex-1 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-bold hover:bg-amber-100 transition cursor-pointer"
                                 >
-                                    Maybe
+                                    Mungkin
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => handleRsvp(ev.id, 'not_going')}
                                     className="flex-1 py-1.5 bg-rose-50 text-rose-700 rounded-lg text-[10px] font-bold hover:bg-rose-100 transition cursor-pointer"
                                 >
-                                    Not Going
+                                    Tidak Hadir
                                 </button>
                             </div>
                         </div>
@@ -184,17 +175,17 @@ export default function EventsPage() {
             {showNewEventModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
                     <form onSubmit={handleCreateEvent} className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-                        <h3 className="font-serif text-lg font-bold">Create New Event</h3>
-                        <input 
+                        <h3 className="font-serif text-lg font-bold">Buat Acara Baru</h3>
+                        <input
                             type="text" required value={newEventForm.title}
                             onChange={e => setNewEventForm({ ...newEventForm, title: e.target.value })}
-                            placeholder="Event Title (e.g. Kopdar Rutin)"
+                            placeholder="Judul acara (contoh: Kopdar Rutin)"
                             className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
                         />
-                        <textarea 
+                        <textarea
                             required value={newEventForm.description}
                             onChange={e => setNewEventForm({ ...newEventForm, description: e.target.value })}
-                            placeholder="Description"
+                            placeholder="Deskripsi acara"
                             rows={3}
                             className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
                         />
@@ -249,7 +240,7 @@ export default function EventsPage() {
                         <input 
                             type="text" required value={newEventForm.location}
                             onChange={e => setNewEventForm({ ...newEventForm, location: e.target.value })}
-                            placeholder="Location (e.g. Cafe A, Jakarta)"
+                            placeholder="Lokasi (contoh: Cafe Seketika, Semarang)"
                             className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
                         />
                         <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -258,11 +249,11 @@ export default function EventsPage() {
                                 onChange={e => setNewEventForm({ ...newEventForm, isOnline: e.target.checked })}
                                 className="w-4 h-4 rounded text-primary focus:ring-primary"
                             />
-                            Is Online Event?
+                            Acara Online?
                         </label>
                         <div className="flex gap-2 pt-2">
-                            <button type="button" onClick={() => setShowNewEventModal(false)} className="flex-1 py-2 bg-gray-100 rounded-xl font-bold text-sm">Cancel</button>
-                            <button type="submit" className="flex-1 py-2 bg-primary text-white rounded-xl font-bold text-sm">Create</button>
+                            <button type="button" onClick={() => setShowNewEventModal(false)} className="flex-1 py-2 bg-gray-100 rounded-xl font-bold text-sm">Batal</button>
+                            <button type="submit" className="flex-1 py-2 bg-primary text-white rounded-xl font-bold text-sm">Buat</button>
                         </div>
                     </form>
                 </div>

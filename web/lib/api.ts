@@ -63,7 +63,8 @@ const DEFAULT_MOCK_DATA = {
             ],
             periods: [
                 { id: 'period_1', status: 'done', endDate: new Date(Date.now() - 30 * 86400000).toISOString(), winner: { name: 'Bu Linda' } }
-            ]
+            ],
+            setoran: [] as { participantId: string; memberId: string; memberName: string; amount: number; paidAt: string }[]
         }
     },
     events: [
@@ -269,10 +270,35 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
                 id: `period_${Date.now()}`,
                 status: 'done',
                 endDate: new Date().toISOString(),
-                winner: { name: winner.member?.name || 'Unknown' }
+                winner: { name: winner.member?.name || 'Unknown' },
+                totalSetoran: (state.arisan[key].setoran || []).length
             });
+            state.arisan[key].setoran = []; // reset setoran untuk putaran baru
             saveMockState(state);
             return { success: true, winner } as unknown as T;
+        }
+
+        // POST /pockets/{id}/arisan/setoran  (member bayar setoran putaran ini)
+        const arisanSetoran = path.match(/^\/pockets\/([^/]+)\/arisan\/setoran$/);
+        if (arisanSetoran) {
+            const key = arisanSetoran[1] as keyof typeof state.arisan;
+            if (!state.arisan[key]) state.arisan[key] = { participants: [], periods: [], setoran: [] };
+            if (!state.arisan[key].setoran) state.arisan[key].setoran = [];
+            const alreadyPaid = state.arisan[key].setoran.some((s: any) => s.participantId === body.participantId);
+            if (!alreadyPaid) {
+                state.arisan[key].setoran.push({
+                    participantId: body.participantId,
+                    memberId: body.memberId,
+                    memberName: body.memberName,
+                    amount: body.amount,
+                    paidAt: new Date().toISOString(),
+                });
+                // tambah balance pocket arisan
+                const pocket = state.pockets.find((p: any) => p.id === arisanSetoran[1]);
+                if (pocket) pocket.balance = (parseInt(pocket.balance, 10) || 0) + body.amount;
+                saveMockState(state);
+            }
+            return { success: true } as unknown as T;
         }
 
         // POST /pockets/{id}/arisan/participants
@@ -353,6 +379,48 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
                 });
                 saveMockState(state);
             }
+            return { success: true } as unknown as T;
+        }
+
+        // POST /contributions/{id}/simulate-pay  (langsung masuk pocket)
+        const simPay = path.match(/^\/contributions\/([^/]+)\/simulate-pay$/);
+        if (simPay) {
+            const id = simPay[1];
+            const contrib = state.contributions.find((c: any) => c.id === id);
+            if (contrib) {
+                const due = state.dues.find((d: any) => d.id === contrib.schedule?.id);
+                if (due && (due as any).pocketId) {
+                    const pocketId = (due as any).pocketId;
+                    state.pockets = state.pockets.map((p: any) =>
+                        p.id === pocketId ? { ...p, balance: (parseInt(p.balance, 10) || 0) + contrib.amount } : p
+                    );
+                    state.transactions.unshift({
+                        id: `tx_${Date.now()}`,
+                        pocketId,
+                        amount: contrib.amount.toString(),
+                        direction: 'in',
+                        note: `Iuran: ${contrib.schedule?.title}`,
+                        category: 'dues',
+                        createdAt: new Date().toISOString(),
+                        member: { name: contrib.member?.name || state.user.name }
+                    });
+                }
+                state.contributions = state.contributions.map((c: any) =>
+                    c.id === id ? { ...c, status: 'paid' } : c
+                );
+                saveMockState(state);
+            }
+            return { success: true } as unknown as T;
+        }
+
+        // POST /contributions/{id}/report  (member lapor bayar)
+        const reportContrib = path.match(/^\/contributions\/([^/]+)\/report$/);
+        if (reportContrib) {
+            const id = reportContrib[1];
+            state.contributions = state.contributions.map((c: any) =>
+                c.id === id ? { ...c, status: 'pending_verify', proofUrl: body.proofUrl || '' } : c
+            );
+            saveMockState(state);
             return { success: true } as unknown as T;
         }
 
@@ -516,6 +584,10 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
         const contribsMatch = path.match(/^\/communities\/([^/]+)\/contributions$/);
         if (contribsMatch) return state.contributions as unknown as T;
 
+        // GET /communities/{id}/contributions/mine
+        const myContribsMatch = path.match(/^\/communities\/([^/]+)\/contributions\/mine$/);
+        if (myContribsMatch) return state.contributions.filter((c: any) => c.member?.id === state.user.id) as unknown as T;
+
         // GET /communities/{id}/events
         const eventsMatch = path.match(/^\/communities\/([^/]+)\/events$/);
         if (eventsMatch) return state.events as unknown as T;
@@ -544,6 +616,13 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
             const key = arisanPeriods[1] as keyof typeof state.arisan;
             return (state.arisan[key]?.periods || []) as unknown as T;
         }
+
+        // GET /pockets/{id}/arisan/setoran
+        const arisanSetoranGet = path.match(/^\/pockets\/([^/]+)\/arisan\/setoran$/);
+        if (arisanSetoranGet) {
+            const key = arisanSetoranGet[1] as keyof typeof state.arisan;
+            return (state.arisan[key]?.setoran || []) as unknown as T;
+        }
     }
 
     throw new Error(`Mock endpoint not implemented: ${method} ${path}`);
@@ -560,7 +639,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
                 ...(init.headers ?? {}),
             },
         });
-        if (res.status >= 500) {
+        if (res.status >= 500 || res.status === 404) {
             console.warn(`[Kyklos API Bridge] Backend ${res.status} untuk ${path}. Menggunakan data dummy lokal.`);
             return mockReq<T>(path, init);
         }

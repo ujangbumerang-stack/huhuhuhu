@@ -31,7 +31,6 @@ interface DashboardData {
 
 export default function DashboardPage() {
     const router = useRouter();
-    const [slug, setSlug] = useState<string>('keluarga-cemara');
     const [data, setData] = useState<DashboardData | null>(null);
     const [communityId, setCommunityId] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(true);
@@ -40,35 +39,33 @@ export default function DashboardPage() {
 
     const { role } = useContext(CommunityContext);
 
-    // Ambil active slug dari localStorage
-    useEffect(() => {
-        const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
-        setSlug(activeSlug);
-    }, []);
-
-    // Memuat data dasbor utama komunitas
-    const loadDashboard = () => {
-        api.get<any[]>('/communities').then(list => {
-            const c = list.find(x => x.slug === slug) || list[0];
-            if (!c) {
-                router.push('/login');
-                return;
-            }
+    const loadDashboard = async () => {
+        setLoading(true);
+        try {
+            const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
+            const list = await api.get<any[]>('/communities');
+            const c = list.find(x => x.slug === activeSlug) || list[0];
+            if (!c) { router.push('/login'); return; }
             setCommunityId(c.id);
             localStorage.setItem('kyklos_active_community_slug', c.slug);
-            return api.get<DashboardData>(`/communities/${c.id}/dashboard`);
-        }).then(d => {
+            const d = await api.get<DashboardData>(`/communities/${c.id}/dashboard`);
             if (d) setData(d);
-            setLoading(false);
-        }).catch(() => {
+        } catch {
             router.push('/login');
+        } finally {
             setLoading(false);
-        });
+        }
     };
 
     useEffect(() => {
         loadDashboard();
-    }, [slug, router]);
+        // Refresh otomatis saat tab pembayaran selesai
+        const onStorage = (e: StorageEvent) => {
+            if (e.key === 'kyklos_payment_done') loadDashboard();
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, []);
 
     // Verifikasi pembayaran warga secara langsung
     const handleVerify = async (id: string) => {

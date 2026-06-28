@@ -91,8 +91,8 @@ export default function WalletPage() {
         <div className="space-y-6 relative">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Community Wallet</h1>
-                    <p className="text-xs sm:text-sm text-gray-400 font-semibold">Manage community funds, top up balance, and withdraw money.</p>
+                    <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Dompet Komunitas</h1>
+                    <p className="text-xs sm:text-sm text-gray-400 font-semibold">Kelola dana komunitas, isi saldo, dan lakukan penarikan.</p>
                 </div>
             </div>
 
@@ -101,7 +101,7 @@ export default function WalletPage() {
                     <svg className="w-24 h-24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                 </div>
                 <div className="relative z-10">
-                    <span className="text-[10px] font-bold text-teal-300 uppercase tracking-wider">Available Balance</span>
+                    <span className="text-[10px] font-bold text-teal-300 uppercase tracking-wider">Saldo Tersedia</span>
                     <div className="space-y-1 mt-4">
                         <p className="font-serif text-3xl font-black tracking-tight text-white">
                             {loading ? '...' : idr(balance)}
@@ -115,11 +115,11 @@ export default function WalletPage() {
                             Top Up
                         </button>
                         {role === 'admin' && (
-                            <button 
+                            <button
                                 onClick={() => setShowWithdrawModal(true)}
                                 className="flex-1 py-2.5 border border-white/20 text-white rounded-xl text-xs font-bold hover:bg-white/10 transition shadow-sm cursor-pointer"
                             >
-                                Withdraw
+                                Tarik Dana
                             </button>
                         )}
                     </div>
@@ -129,7 +129,7 @@ export default function WalletPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                 <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/20">
-                        <h3 className="font-serif text-base font-bold text-slate-800 tracking-tight">Top Up History</h3>
+                        <h3 className="font-serif text-base font-bold text-slate-800 tracking-tight">Riwayat Top Up</h3>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
@@ -157,7 +157,7 @@ export default function WalletPage() {
 
                 <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/20">
-                        <h3 className="font-serif text-base font-bold text-slate-800 tracking-tight">Withdrawal History</h3>
+                        <h3 className="font-serif text-base font-bold text-slate-800 tracking-tight">Riwayat Penarikan</h3>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
@@ -167,7 +167,7 @@ export default function WalletPage() {
                                 ) : withdrawals.map(w => (
                                     <tr key={w.id} className="hover:bg-gray-50/30">
                                         <td className="px-6 py-3.5">
-                                            <p className="text-xs font-bold text-slate-800">Withdrawal to {w.bankName}</p>
+                                            <p className="text-xs font-bold text-slate-800">Penarikan ke {w.bankName}</p>
                                             <p className="text-[10px] text-gray-400">{w.accountNumber} • {new Date(w.createdAt).toLocaleDateString()}</p>
                                         </td>
                                         <td className="px-6 py-3.5 text-xs font-extrabold text-slate-800">-{idr(w.amount)}</td>
@@ -187,15 +187,15 @@ export default function WalletPage() {
             {showTopupModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
                     <form onSubmit={handleTopup} className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-                        <h3 className="font-serif text-lg font-bold">Top Up Wallet</h3>
-                        <input 
+                        <h3 className="font-serif text-lg font-bold">Isi Saldo Dompet</h3>
+                        <input
                             type="number" required value={topupForm.amount}
                             onChange={e => setTopupForm({ amount: e.target.value })}
-                            placeholder="Amount (e.g. 100000)"
+                            placeholder="Jumlah (contoh: 100000)"
                             className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
                         />
                         <div className="flex gap-2 pt-2">
-                            <button type="button" onClick={() => setShowTopupModal(false)} className="flex-1 py-2 bg-gray-100 rounded-xl font-bold text-sm">Cancel</button>
+                            <button type="button" onClick={() => setShowTopupModal(false)} className="flex-1 py-2 bg-gray-100 rounded-xl font-bold text-sm">Batal</button>
                             <button type="submit" className="flex-1 py-2 bg-primary text-white rounded-xl font-bold text-sm">Top Up</button>
                         </div>
                     </form>
@@ -205,34 +205,34 @@ export default function WalletPage() {
             {showWithdrawModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
                     <form onSubmit={handleWithdraw} className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-                        <h3 className="font-serif text-lg font-bold">Withdraw Funds</h3>
-                        <input 
+                        <h3 className="font-serif text-lg font-bold">Tarik Dana</h3>
+                        <input
                             type="number" required value={withdrawForm.amount}
                             onChange={e => setWithdrawForm({ ...withdrawForm, amount: e.target.value })}
-                            placeholder="Amount (e.g. 50000)"
+                            placeholder="Jumlah (contoh: 50000)"
                             className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
                         />
-                        <input 
+                        <input
                             type="text" required value={withdrawForm.bankName}
                             onChange={e => setWithdrawForm({ ...withdrawForm, bankName: e.target.value })}
-                            placeholder="Bank Name (e.g. BCA)"
+                            placeholder="Nama Bank (contoh: BCA)"
                             className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
                         />
-                        <input 
+                        <input
                             type="text" required value={withdrawForm.accountNumber}
                             onChange={e => setWithdrawForm({ ...withdrawForm, accountNumber: e.target.value })}
-                            placeholder="Account Number"
+                            placeholder="Nomor Rekening"
                             className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
                         />
-                        <input 
+                        <input
                             type="text" required value={withdrawForm.accountHolder}
                             onChange={e => setWithdrawForm({ ...withdrawForm, accountHolder: e.target.value })}
-                            placeholder="Account Holder Name"
+                            placeholder="Nama Pemilik Rekening"
                             className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
                         />
                         <div className="flex gap-2 pt-2">
-                            <button type="button" onClick={() => setShowWithdrawModal(false)} className="flex-1 py-2 bg-gray-100 rounded-xl font-bold text-sm">Cancel</button>
-                            <button type="submit" className="flex-1 py-2 bg-primary text-white rounded-xl font-bold text-sm">Withdraw</button>
+                            <button type="button" onClick={() => setShowWithdrawModal(false)} className="flex-1 py-2 bg-gray-100 rounded-xl font-bold text-sm">Batal</button>
+                            <button type="submit" className="flex-1 py-2 bg-primary text-white rounded-xl font-bold text-sm">Tarik Dana</button>
                         </div>
                     </form>
                 </div>

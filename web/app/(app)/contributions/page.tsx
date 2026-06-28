@@ -1,16 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { idr } from '@/lib/format';
+import { CommunityContext } from '@/app/(app)/layout';
 
 interface Due {
     id: string;
     title: string;
     amount: number;
     dueDate: string;
-    frequency: string;
+    frequency?: string;
+    period?: string;
     isMandatory: boolean;
 }
 
@@ -25,40 +27,42 @@ interface Contribution {
 
 export default function ContributionsPage() {
     const router = useRouter();
-    const [slug, setSlug] = useState('keluarga-cemara');
+    const { role } = useContext(CommunityContext);
+    const isAdmin = role === 'admin';
     const [communityId, setCommunityId] = useState('');
     const [dues, setDues] = useState<Due[]>([]);
     const [contributions, setContributions] = useState<Contribution[]>([]);
     const [pockets, setPockets] = useState<any[]>([]);
+    const [paymentConfig, setPaymentConfig] = useState<{ bankName: string; accountNumber: string; accountHolder: string } | null>(null);
     const [loading, setLoading] = useState(true);
 
+    const [myContributions, setMyContributions] = useState<Contribution[]>([]);
     const [showNewDueModal, setShowNewDueModal] = useState(false);
     const [newDueForm, setNewDueForm] = useState({
         title: '', amount: '', dueDate: '', frequency: 'monthly', isMandatory: true, pocketId: ''
     });
 
-    useEffect(() => {
-        const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
-        setSlug(activeSlug);
-    }, []);
-
     const loadData = async () => {
         setLoading(true);
         try {
+            const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
             const list = await api.get<any[]>('/communities');
-            const c = list.find(x => x.slug === slug) || list[0];
-            if (!c) {
-                router.push('/login');
-                return;
-            }
+            const c = list.find(x => x.slug === activeSlug) || list[0];
+            if (!c) { router.push('/login'); return; }
             setCommunityId(c.id);
 
-            const fetchedDues = await api.get<Due[]>(`/communities/${c.id}/dues`);
-            const fetchedContribs = await api.get<Contribution[]>(`/communities/${c.id}/contributions`);
-            const fetchedPockets = await api.get<any[]>(`/communities/${c.id}/pockets`);
+            const [fetchedDues, fetchedContribs, fetchedMine, fetchedPockets, fetchedConfig] = await Promise.all([
+                api.get<Due[]>(`/communities/${c.id}/dues`),
+                api.get<Contribution[]>(`/communities/${c.id}/contributions`),
+                api.get<Contribution[]>(`/communities/${c.id}/contributions/mine`),
+                api.get<any[]>(`/communities/${c.id}/pockets`),
+                api.get<any>(`/communities/${c.id}/payment-config`),
+            ]);
             setDues(fetchedDues || []);
             setContributions(fetchedContribs || []);
+            setMyContributions(fetchedMine || []);
             setPockets(fetchedPockets || []);
+            setPaymentConfig(fetchedConfig || null);
             if (fetchedPockets && fetchedPockets.length > 0) {
                 setNewDueForm(prev => ({ ...prev, pocketId: fetchedPockets[0].id }));
             }
@@ -71,7 +75,7 @@ export default function ContributionsPage() {
 
     useEffect(() => {
         loadData();
-    }, [slug, router]);
+    }, []);
 
     const handleCreateDue = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -85,8 +89,7 @@ export default function ContributionsPage() {
                 amount: parseFloat(newDueForm.amount),
                 pocketId: newDueForm.pocketId,
                 dueDate: newDueForm.dueDate || new Date().toISOString(),
-                frequency: newDueForm.frequency,
-                isMandatory: newDueForm.isMandatory
+                period: newDueForm.frequency,
             });
             setShowNewDueModal(false);
             setNewDueForm({ title: '', amount: '', dueDate: '', frequency: 'monthly', isMandatory: true, pocketId: pockets[0]?.id || '' });
@@ -106,6 +109,28 @@ export default function ContributionsPage() {
         }
     };
 
+    const openPayTab = (c: Contribution) => {
+        const cfg = paymentConfig;
+        const p = new URLSearchParams({
+            type: 'contribution',
+            id: c.id,
+            amount: String(c.amount),
+            title: c.schedule?.title || 'Tagihan',
+            bank: cfg?.bankName || 'BCA',
+            account: cfg?.accountNumber || '',
+            holder: cfg?.accountHolder || '',
+        });
+        window.open(`/pay?${p.toString()}`, '_blank', 'width=480,height=700,noopener');
+    };
+
+    useEffect(() => {
+        const onStorage = (e: StorageEvent) => {
+            if (e.key === 'kyklos_payment_done') loadData();
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, []);
+
     const handleVerify = async (id: string) => {
         try {
             await api.post(`/contributions/${id}/verify`, {});
@@ -119,16 +144,18 @@ export default function ContributionsPage() {
         <div className="space-y-6 relative">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Contributions & Dues</h1>
-                    <p className="text-xs sm:text-sm text-gray-400 font-semibold">Manage community dues, generate invoices, and track payments.</p>
+                    <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Tagihan & Iuran</h1>
+                    <p className="text-xs sm:text-sm text-gray-400 font-semibold">Kelola tagihan iuran, buat invoice, dan pantau status pembayaran.</p>
                 </div>
 
-                <button 
-                    onClick={() => setShowNewDueModal(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-90 hover:shadow-md transition shadow-sm cursor-pointer"
-                >
-                    Create New Dues
-                </button>
+                {isAdmin && (
+                    <button
+                        onClick={() => setShowNewDueModal(true)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-90 hover:shadow-md transition shadow-sm cursor-pointer"
+                    >
+                        Buat Tagihan Baru
+                    </button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
@@ -137,18 +164,20 @@ export default function ContributionsPage() {
                         <div className="flex items-start justify-between">
                             <div>
                                 <h3 className="font-serif text-lg font-bold text-slate-800">{d.title}</h3>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">{d.frequency} • {d.isMandatory ? 'Mandatory' : 'Voluntary'}</p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">{d.period ?? d.frequency}</p>
                             </div>
                         </div>
                         <div>
                             <p className="font-serif text-2xl font-black text-primary">{idr(d.amount)}</p>
                         </div>
-                        <button 
-                            onClick={() => handleGenerate(d.id)}
-                            className="w-full py-2 bg-sky-50 text-[#0284C7] rounded-xl text-xs font-bold hover:bg-sky-100 transition cursor-pointer"
-                        >
-                            Generate Invoices for Members
-                        </button>
+                        {isAdmin && (
+                            <button
+                                onClick={() => handleGenerate(d.id)}
+                                className="w-full py-2 bg-sky-50 text-[#0284C7] rounded-xl text-xs font-bold hover:bg-sky-100 transition cursor-pointer"
+                            >
+                                Generate Invoices for Members
+                            </button>
+                        )}
                     </div>
                 ))}
                 {dues.length === 0 && !loading && (
@@ -158,9 +187,44 @@ export default function ContributionsPage() {
                 )}
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden mt-6">
+            {myContributions.length > 0 && (
+                <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/20">
+                        <h3 className="font-serif text-base font-bold text-slate-800 tracking-tight">Tagihan Saya</h3>
+                    </div>
+                    <div className="divide-y divide-gray-50">
+                        {myContributions.map(c => (
+                            <div key={c.id} className="px-6 py-4 flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">{c.schedule?.title}</p>
+                                    <p className="text-xs text-gray-400 font-medium">{idr(c.amount)}</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                                        c.status === 'paid' || c.status === 'verified' ? 'bg-emerald-50 text-emerald-700' :
+                                        c.status === 'pending_verify' ? 'bg-amber-50 text-amber-700' :
+                                        'bg-rose-50 text-rose-600'
+                                    }`}>
+                                        {c.status === 'pending_verify' ? 'MENUNGGU VERIFIKASI' : c.status.toUpperCase()}
+                                    </span>
+                                    {(c.status === 'pending' || c.status === 'unpaid') && (
+                                        <button
+                                            onClick={() => openPayTab(c)}
+                                            className="px-3 py-1.5 bg-primary text-white rounded-lg text-[10px] font-bold hover:brightness-90 transition cursor-pointer"
+                                        >
+                                            Bayar →
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {isAdmin && <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden mt-6">
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/20">
-                    <h3 className="font-serif text-base font-bold text-slate-800 tracking-tight">Recent Invoices</h3>
+                    <h3 className="font-serif text-base font-bold text-slate-800 tracking-tight">Semua Tagihan Anggota</h3>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
@@ -200,8 +264,8 @@ export default function ContributionsPage() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-3.5 text-right">
-                                        {c.status === 'pending_verify' && (
-                                            <button 
+                                        {isAdmin && c.status === 'pending_verify' && (
+                                            <button
                                                 onClick={() => handleVerify(c.id)}
                                                 className="px-3 py-1.5 border border-[#0284C7]/20 rounded-lg text-[10px] font-semibold text-[#0284C7] hover:bg-sky-50 transition cursor-pointer"
                                             >
@@ -214,12 +278,12 @@ export default function ContributionsPage() {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </div>}
 
             {showNewDueModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
                     <form onSubmit={handleCreateDue} className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-                        <h3 className="font-serif text-lg font-bold">Create New Dues</h3>
+                        <h3 className="font-serif text-lg font-bold">Buat Tagihan Baru</h3>
                         <input 
                             type="text" required value={newDueForm.title}
                             onChange={e => setNewDueForm({ ...newDueForm, title: e.target.value })}
