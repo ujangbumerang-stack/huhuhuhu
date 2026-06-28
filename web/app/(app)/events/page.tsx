@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { CommunityContext } from '../layout';
 
 interface Event {
     id: string;
@@ -18,11 +19,11 @@ interface Event {
 
 export default function EventsPage() {
     const router = useRouter();
+    const { role } = useContext(CommunityContext);
+    const isAdmin = role === 'admin';
     const [communityId, setCommunityId] = useState('');
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-
     const [showNewEventModal, setShowNewEventModal] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
     const [newEventForm, setNewEventForm] = useState({
@@ -83,15 +84,6 @@ export default function EventsPage() {
         }
     };
 
-    const handleRsvp = async (id: string, status: string) => {
-        try {
-            await api.post(`/events/${id}/rsvp`, { status });
-            alert('RSVP berhasil disimpan.');
-        } catch (err: any) {
-            alert(err.message || 'Gagal menyimpan RSVP');
-        }
-    };
-
     return (
         <div className="space-y-6 relative">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -100,12 +92,14 @@ export default function EventsPage() {
                     <p className="text-xs sm:text-sm text-gray-400 font-semibold">Temukan dan kelola pertemuan, kopdar, serta acara komunitas.</p>
                 </div>
 
-                <button 
-                    onClick={() => setShowNewEventModal(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-90 hover:shadow-md transition shadow-sm cursor-pointer"
-                >
-                    Buat Acara Baru
-                </button>
+                {isAdmin && (
+                    <button
+                        onClick={() => setShowNewEventModal(true)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-90 hover:shadow-md transition shadow-sm cursor-pointer"
+                    >
+                        Buat Acara Baru
+                    </button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
@@ -118,9 +112,9 @@ export default function EventsPage() {
                 )}
 
                 {events.map(ev => (
-                    <div 
-                        key={ev.id} 
-                        onClick={() => setSelectedEvent(ev)}
+                    <div
+                        key={ev.id}
+                        onClick={() => router.push(`/events/${ev.id}`)}
                         className="bg-white rounded-2xl border border-gray-200/80 p-0 shadow-sm overflow-hidden flex flex-col h-full cursor-pointer hover:border-primary hover:shadow-md transition duration-200 group"
                     >
                         <div className="h-32 bg-slate-100 w-full relative">
@@ -137,35 +131,20 @@ export default function EventsPage() {
                         </div>
                         <div className="p-5 flex-1 flex flex-col">
                             <h3 className="font-serif text-lg font-bold text-slate-800 line-clamp-1 group-hover:text-primary transition">{ev.title}</h3>
-                            <p className="text-xs text-slate-500 font-medium mt-1 mb-3 flex items-center gap-1.5">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            <p className="text-xs text-slate-500 font-medium mt-1 mb-2 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                 {new Date(ev.eventDate || ev.date).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
                             </p>
                             <p className="text-xs text-slate-500 font-medium mb-3 flex items-center gap-1.5">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                 <span className="line-clamp-1">{ev.location}</span>
                             </p>
                             <p className="text-[11px] text-slate-600 line-clamp-2 flex-1">{ev.description}</p>
-                            
-                            <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2" onClick={e => e.stopPropagation()}>
-                                <button 
-                                    onClick={() => handleRsvp(ev.id, 'going')}
-                                    className="flex-1 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-bold hover:bg-emerald-100 transition cursor-pointer"
-                                >
-                                    Hadir
-                                </button>
-                                <button
-                                    onClick={() => handleRsvp(ev.id, 'maybe')}
-                                    className="flex-1 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-bold hover:bg-amber-100 transition cursor-pointer"
-                                >
-                                    Mungkin
-                                </button>
-                                <button
-                                    onClick={() => handleRsvp(ev.id, 'not_going')}
-                                    className="flex-1 py-1.5 bg-rose-50 text-rose-700 rounded-lg text-[10px] font-bold hover:bg-rose-100 transition cursor-pointer"
-                                >
-                                    Tidak Hadir
-                                </button>
+                            <div className="mt-4 pt-3 border-t border-gray-100">
+                                <span className="text-[10px] font-bold text-primary flex items-center gap-1 group-hover:gap-2 transition-all">
+                                    Lihat Detail
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -259,96 +238,6 @@ export default function EventsPage() {
                 </div>
             )}
 
-            {/* ── Modal: Detail Event ── */}
-            {selectedEvent && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4">
-                    <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl space-y-6 max-h-[85vh] sm:max-h-[80vh] flex flex-col overflow-y-auto">
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider mb-2 ${
-                                    selectedEvent.isOnline ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'
-                                }`}>
-                                    {selectedEvent.isOnline ? 'Online' : 'Offline / Tatap Muka'}
-                                </span>
-                                <h3 className="font-serif text-2xl font-black text-slate-800 tracking-tight leading-tight">{selectedEvent.title}</h3>
-                            </div>
-                            <button 
-                                type="button" 
-                                onClick={() => setSelectedEvent(null)} 
-                                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 cursor-pointer transition"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        {/* Banner */}
-                        <div className="h-48 bg-slate-100 w-full rounded-xl overflow-hidden relative">
-                            {selectedEvent.imageUrl || selectedEvent.bannerUrl ? (
-                                <img src={selectedEvent.imageUrl || selectedEvent.bannerUrl} alt={selectedEvent.title} className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full bg-gradient-to-tr from-sky-100 to-indigo-50 flex items-center justify-center text-slate-300">
-                                    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Info details */}
-                        <div className="space-y-3">
-                            <div className="flex items-start gap-3 text-sm text-slate-600">
-                                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-gray-100 flex items-center justify-center flex-shrink-0 text-slate-400">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-slate-800">Waktu & Tanggal</p>
-                                    <p className="text-xs text-gray-500 mt-0.5">{new Date(selectedEvent.eventDate || selectedEvent.date).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' })}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3 text-sm text-slate-600">
-                                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-gray-100 flex items-center justify-center flex-shrink-0 text-slate-400">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-slate-800">Lokasi Pertemuan</p>
-                                    <p className="text-xs text-gray-500 mt-0.5">{selectedEvent.location}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Description */}
-                        <div className="space-y-1.5 pt-2 border-t border-gray-100">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Deskripsi Event</p>
-                            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{selectedEvent.description || 'Tidak ada deskripsi lengkap.'}</p>
-                        </div>
-
-                        {/* RSVP Buttons */}
-                        <div className="pt-4 border-t border-gray-100 space-y-3">
-                            <p className="text-center text-xs font-bold text-slate-700">Apakah Anda akan hadir?</p>
-                            <div className="flex gap-2">
-                                <button 
-                                    onClick={() => { handleRsvp(selectedEvent.id, 'going'); setSelectedEvent(null); }}
-                                    className="flex-1 py-3 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-extrabold hover:bg-emerald-100 transition cursor-pointer"
-                                >
-                                    Hadir (Going)
-                                </button>
-                                <button 
-                                    onClick={() => { handleRsvp(selectedEvent.id, 'maybe'); setSelectedEvent(null); }}
-                                    className="flex-1 py-3 bg-amber-50 text-amber-700 rounded-xl text-xs font-extrabold hover:bg-amber-100 transition cursor-pointer"
-                                >
-                                    Ragu (Maybe)
-                                </button>
-                                <button 
-                                    onClick={() => { handleRsvp(selectedEvent.id, 'not_going'); setSelectedEvent(null); }}
-                                    className="flex-1 py-3 bg-rose-50 text-rose-700 rounded-xl text-xs font-extrabold hover:bg-rose-100 transition cursor-pointer"
-                                >
-                                    Absen (Not Going)
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

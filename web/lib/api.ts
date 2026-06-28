@@ -35,12 +35,34 @@ const DEFAULT_MOCK_DATA = {
         { id: 'pocket_3', communityId: 'comm_1', name: 'Dana Darurat', type: 'DARURAT', description: 'Dana sosial & darurat', balance: 10000000, status: 'locked' }
     ],
     transactions: [
-        { id: 'tx_1', pocketId: 'pocket_1', amount: 250000, direction: 'out', note: 'Pembelian Kopi & Snack di Aruna', category: 'pengeluaran_manual', createdAt: new Date(Date.now() - 3600000).toISOString(), member: { name: 'Pak RT (Bendahara)' } },
-        { id: 'tx_2', pocketId: 'pocket_1', amount: 1000000, direction: 'in', note: 'Iuran Bulanan Warga', category: 'pemasukan_manual', createdAt: new Date(Date.now() - 86400000).toISOString(), member: { name: 'Bu Linda' } }
+        { id: 'tx_1',  pocketId: 'pocket_1', amount: 250000,  direction: 'out', note: 'Pembelian Kopi & Snack di Aruna',        createdAt: new Date(Date.now() -  1 * 3600000).toISOString(),   createdBy: { name: 'Pak RT (Bendahara)' } },
+        { id: 'tx_2',  pocketId: 'pocket_1', amount: 1000000, direction: 'in',  note: 'Iuran Bulanan Warga',                    createdAt: new Date(Date.now() -  2 * 3600000).toISOString(),   createdBy: { name: 'Bu Linda' } },
+        { id: 'tx_3',  pocketId: 'pocket_1', amount: 500000,  direction: 'out', note: 'Biaya Cetak Undangan Pertemuan',         createdAt: new Date(Date.now() -  1 * 86400000).toISOString(),  createdBy: { name: 'Pak RT (Bendahara)' } },
+        { id: 'tx_4',  pocketId: 'pocket_1', amount: 750000,  direction: 'in',  note: 'Donasi Warga Baru (Pak Eko)',            createdAt: new Date(Date.now() -  2 * 86400000).toISOString(),  createdBy: { name: 'Pak RT (Bendahara)' } },
+        { id: 'tx_5',  pocketId: 'pocket_1', amount: 300000,  direction: 'out', note: 'Listrik Pos Ronda',                      createdAt: new Date(Date.now() -  3 * 86400000).toISOString(),  createdBy: { name: 'Pak RT (Bendahara)' } },
+        { id: 'tx_6',  pocketId: 'pocket_1', amount: 200000,  direction: 'out', note: 'Kebersihan Lingkungan',                  createdAt: new Date(Date.now() -  5 * 86400000).toISOString(),  createdBy: { name: 'Pak RT (Bendahara)' } },
+        { id: 'tx_7',  pocketId: 'pocket_1', amount: 2000000, direction: 'in',  note: 'Iuran Warga — Batch Oktober',            createdAt: new Date(Date.now() -  7 * 86400000).toISOString(),  createdBy: { name: 'Pak RT (Bendahara)' } },
+        { id: 'tx_8',  pocketId: 'pocket_1', amount: 150000,  direction: 'out', note: 'Fotokopi Surat Edaran',                  createdAt: new Date(Date.now() -  9 * 86400000).toISOString(),  createdBy: { name: 'Pak RT (Bendahara)' } },
+        { id: 'tx_9',  pocketId: 'pocket_1', amount: 450000,  direction: 'out', note: 'Konsumsi Rapat Warga Bulanan',           createdAt: new Date(Date.now() - 12 * 86400000).toISOString(),  createdBy: { name: 'Pak RT (Bendahara)' } },
+        { id: 'tx_10', pocketId: 'pocket_1', amount: 1500000, direction: 'in',  note: 'Iuran Warga — Batch September',          createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),  createdBy: { name: 'Pak RT (Bendahara)' } },
+        { id: 'tx_11', pocketId: 'pocket_1', amount: 800000,  direction: 'out', note: 'Perbaikan Lampu Jalan Gang Mawar',       createdAt: new Date(Date.now() - 18 * 86400000).toISOString(),  createdBy: { name: 'Pak RT (Bendahara)' } },
+        { id: 'tx_12', pocketId: 'pocket_1', amount: 600000,  direction: 'in',  note: 'Penerimaan Sumbangan Acara 17 Agustus', createdAt: new Date(Date.now() - 20 * 86400000).toISOString(),  createdBy: { name: 'Bu Linda' } },
+        { id: 'tx_13', pocketId: 'pocket_2', amount: 100000,  direction: 'in',  note: 'Setoran Arisan — Bu Linda',              createdAt: new Date(Date.now() -  1 * 86400000).toISOString(),  createdBy: { name: 'Bu Linda' } },
+        { id: 'tx_14', pocketId: 'pocket_2', amount: 100000,  direction: 'in',  note: 'Setoran Arisan — Pak Budi',              createdAt: new Date(Date.now() -  2 * 86400000).toISOString(),  createdBy: { name: 'Pak Budi' } },
     ],
     contributions: [
-        { id: 'contr_1', amount: 100000, status: 'pending', member: { id: 'user_2', name: 'Bu Linda', email: 'linda@mail.com' }, schedule: { id: 'due_1', title: 'Iuran Bulanan RT' } },
-        { id: 'contr_2', amount: 100000, status: 'paid', member: { id: 'user_3', name: 'Pak Budi', email: 'budi@mail.com' }, schedule: { id: 'due_1', title: 'Iuran Bulanan RT' } }
+        { id: 'contr_1',  amount: 100000, status: 'pending',        member: { id: 'user_2', name: 'Bu Linda',         email: 'linda@mail.com'  }, schedule: { id: 'due_1', title: 'Iuran Bulanan RT' } },
+        { id: 'contr_2',  amount: 100000, status: 'paid',           member: { id: 'user_3', name: 'Pak Budi',         email: 'budi@mail.com'   }, schedule: { id: 'due_1', title: 'Iuran Bulanan RT' } },
+        { id: 'contr_3',  amount: 100000, status: 'pending_verify', member: { id: 'user_2', name: 'Bu Linda',         email: 'linda@mail.com'  }, schedule: { id: 'due_1', title: 'Iuran Keamanan'   } },
+        { id: 'contr_4',  amount: 50000,  status: 'unpaid',         member: { id: 'user_3', name: 'Pak Budi',         email: 'budi@mail.com'   }, schedule: { id: 'due_2', title: 'Iuran Kebersihan' } },
+        { id: 'contr_5',  amount: 100000, status: 'paid',           member: { id: 'user_2', name: 'Bu Linda',         email: 'linda@mail.com'  }, schedule: { id: 'due_1', title: 'Iuran Bulanan RT' } },
+        { id: 'contr_6',  amount: 100000, status: 'unpaid',         member: { id: 'user_3', name: 'Pak Budi',         email: 'budi@mail.com'   }, schedule: { id: 'due_1', title: 'Iuran Bulanan RT' } },
+        { id: 'contr_7',  amount: 50000,  status: 'paid',           member: { id: 'user_2', name: 'Bu Linda',         email: 'linda@mail.com'  }, schedule: { id: 'due_2', title: 'Iuran Kebersihan' } },
+        { id: 'contr_8',  amount: 100000, status: 'pending',        member: { id: 'user_3', name: 'Pak Budi',         email: 'budi@mail.com'   }, schedule: { id: 'due_1', title: 'Iuran Bulanan RT' } },
+        { id: 'contr_9',  amount: 100000, status: 'paid',           member: { id: 'user_2', name: 'Bu Linda',         email: 'linda@mail.com'  }, schedule: { id: 'due_1', title: 'Iuran Keamanan'   } },
+        { id: 'contr_10', amount: 50000,  status: 'unpaid',         member: { id: 'user_3', name: 'Pak Budi',         email: 'budi@mail.com'   }, schedule: { id: 'due_2', title: 'Iuran Kebersihan' } },
+        { id: 'contr_11', amount: 100000, status: 'pending_verify', member: { id: 'user_2', name: 'Bu Linda',         email: 'linda@mail.com'  }, schedule: { id: 'due_1', title: 'Iuran Bulanan RT' } },
+        { id: 'contr_12', amount: 100000, status: 'paid',           member: { id: 'user_3', name: 'Pak Budi',         email: 'budi@mail.com'   }, schedule: { id: 'due_1', title: 'Iuran Bulanan RT' } },
     ],
     dues: [
         { id: 'due_1', title: 'Iuran Bulanan RT', amount: 100000, dueDate: new Date(Date.now() + 7 * 86400000).toISOString(), frequency: 'monthly', isMandatory: true }
@@ -119,12 +141,34 @@ function getMockState() {
         }));
     }
 
-    // Merge — new top-level keys (wallet, arisan, events, forum, dues) fall back to defaults
+    // Migrate batch arisan entries back to flat structure (batch experiment reverted)
+    if (parsed.arisan) {
+        for (const key of Object.keys(parsed.arisan)) {
+            const entry = parsed.arisan[key];
+            if (entry && entry.batches) {
+                const active = entry.batches.find((b: any) => b.id === entry.activeBatchId) ?? entry.batches[0] ?? {};
+                parsed.arisan[key] = {
+                    participants: active.participants ?? [],
+                    periods: active.periods ?? [],
+                    setoran: active.setoran ?? [],
+                };
+            }
+        }
+    }
+
+    // Merge — seed transactions/contributions tetap ada meski localStorage punya data lama
+    const mergeById = (stored: any[], seed: any[]) => {
+        const ids = new Set((stored || []).map((x: any) => x.id));
+        return [...(stored || []), ...seed.filter((x: any) => !ids.has(x.id))];
+    };
+
     return {
         ...DEFAULT_MOCK_DATA,
         ...parsed,
         wallet: { ...DEFAULT_MOCK_DATA.wallet, ...parsed.wallet },
         arisan: { ...DEFAULT_MOCK_DATA.arisan, ...(parsed.arisan ?? {}) },
+        transactions: mergeById(parsed.transactions, DEFAULT_MOCK_DATA.transactions),
+        contributions: mergeById(parsed.contributions, DEFAULT_MOCK_DATA.contributions),
     };
 }
 
@@ -132,6 +176,7 @@ function saveMockState(state: any) {
     if (typeof window === 'undefined') return;
     localStorage.setItem('kyklos_mock_state', JSON.stringify(state));
 }
+
 
 async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
     const token = getToken();
@@ -164,6 +209,25 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
             saveMockState(state);
             return { success: true } as unknown as T;
         }
+
+        // DELETE /pockets/{id}/arisan/participants/{participantId}
+        const deleteArisanPart = path.match(/^\/pockets\/([^/]+)\/arisan\/participants\/([^/]+)$/);
+        if (deleteArisanPart) {
+            const key = deleteArisanPart[1] as keyof typeof state.arisan;
+            if (state.arisan[key]) {
+                state.arisan[key].participants = state.arisan[key].participants.filter((p: any) => p.id !== deleteArisanPart[2]);
+                saveMockState(state);
+            }
+            return { success: true } as unknown as T;
+        }
+
+        // DELETE /events/{id}
+        const deleteEvent = path.match(/^\/events\/([^/]+)$/);
+        if (deleteEvent) {
+            state.events = state.events.filter((e: any) => e.id !== deleteEvent[1]);
+            saveMockState(state);
+            return { success: true } as unknown as T;
+        }
     }
 
     // ── PATCH / PUT ──────────────────────────────────────────────────────────
@@ -191,6 +255,17 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
             state.paymentConfig = { ...state.paymentConfig, ...body };
             saveMockState(state);
             return { success: true } as unknown as T;
+        }
+
+        // PATCH /pockets/{id}
+        const patchPocket = path.match(/^\/pockets\/([^/]+)$/);
+        if (patchPocket) {
+            state.pockets = state.pockets.map((p: any) =>
+                p.id === patchPocket[1] ? { ...p, ...body } : p
+            );
+            saveMockState(state);
+            const updated = state.pockets.find((p: any) => p.id === patchPocket[1]);
+            return updated as unknown as T;
         }
     }
 
@@ -262,7 +337,7 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
         if (arisanDraw) {
             const pocketId = arisanDraw[1];
             const key = pocketId as keyof typeof state.arisan;
-            if (!state.arisan[key]) state.arisan[key] = { participants: [], periods: [] };
+            if (!state.arisan[key]) state.arisan[key] = { participants: [], periods: [], setoran: [] };
             const participants = state.arisan[key].participants;
             if (participants.length === 0) throw new Error('Tidak ada peserta arisan');
             const winner = participants[Math.floor(Math.random() * participants.length)];
@@ -273,7 +348,7 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
                 winner: { name: winner.member?.name || 'Unknown' },
                 totalSetoran: (state.arisan[key].setoran || []).length
             });
-            state.arisan[key].setoran = []; // reset setoran untuk putaran baru
+            state.arisan[key].setoran = [];
             saveMockState(state);
             return { success: true, winner } as unknown as T;
         }
@@ -293,7 +368,6 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
                     amount: body.amount,
                     paidAt: new Date().toISOString(),
                 });
-                // tambah balance pocket arisan
                 const pocket = state.pockets.find((p: any) => p.id === arisanSetoran[1]);
                 if (pocket) pocket.balance = (parseInt(pocket.balance, 10) || 0) + body.amount;
                 saveMockState(state);
@@ -306,12 +380,14 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
         if (arisanAddMember) {
             const pocketId = arisanAddMember[1];
             const key = pocketId as keyof typeof state.arisan;
-            if (!state.arisan[key]) state.arisan[key] = { participants: [], periods: [] };
+            if (!state.arisan[key]) state.arisan[key] = { participants: [], periods: [], setoran: [] };
+            const alreadyIn = state.arisan[key].participants.some((p: any) => p.memberId === body.memberId);
+            if (alreadyIn) return state.arisan[key].participants.find((p: any) => p.memberId === body.memberId) as unknown as T;
             const member = state.members.find((m: any) => m.id === body.memberId);
             const newParticipant = {
                 id: `ap_${Date.now()}`,
                 memberId: body.memberId,
-                member: { name: member?.user?.name || 'Unknown' },
+                member: { name: member?.user?.name || member?.user?.name || 'Unknown' },
                 createdAt: new Date().toISOString()
             };
             state.arisan[key].participants.push(newParticipant);
@@ -588,6 +664,14 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
         const myContribsMatch = path.match(/^\/communities\/([^/]+)\/contributions\/mine$/);
         if (myContribsMatch) return state.contributions.filter((c: any) => c.member?.id === state.user.id) as unknown as T;
 
+        // GET /events/{id}
+        const eventByIdMatch = path.match(/^\/events\/([^/]+)$/);
+        if (eventByIdMatch) {
+            const ev = state.events.find((e: any) => e.id === eventByIdMatch[1]);
+            if (!ev) throw new Error('Event tidak ditemukan');
+            return ev as unknown as T;
+        }
+
         // GET /communities/{id}/events
         const eventsMatch = path.match(/^\/communities\/([^/]+)\/events$/);
         if (eventsMatch) return state.events as unknown as T;
@@ -595,6 +679,24 @@ async function mockReq<T>(path: string, init: RequestInit = {}): Promise<T> {
         // GET /communities/{id}/forum
         const forumMatch = path.match(/^\/communities\/([^/]+)\/forum$/);
         if (forumMatch) return state.forum as unknown as T;
+
+        // GET /communities/{id}/transactions?page=N&limit=N  (buku besar)
+        const communityTxMatch = path.match(/^\/communities\/([^/]+)\/transactions/);
+        if (communityTxMatch) {
+            const urlObj = new URL(path, 'http://x');
+            const pageNum = Math.max(1, Number(urlObj.searchParams.get('page') || '1'));
+            const limitNum = Math.max(1, Number(urlObj.searchParams.get('limit') || '25'));
+            const communityPocketIds = (state.pockets || []).map((p: any) => p.id);
+            const all = (state.transactions || [])
+                .filter((t: any) => communityPocketIds.includes(t.pocketId))
+                .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            const pockets: any[] = state.pockets || [];
+            const data = all.slice((pageNum - 1) * limitNum, pageNum * limitNum).map((t: any) => {
+                const pocket = pockets.find((p: any) => p.id === t.pocketId);
+                return { ...t, pocket: pocket ? { name: pocket.name, type: pocket.type } : null };
+            });
+            return { data, total: all.length, totalPages: Math.max(1, Math.ceil(all.length / limitNum)) } as unknown as T;
+        }
 
         // GET /pockets/{id}/transactions
         const txMatch = path.match(/^\/pockets\/([^/]+)\/transactions$/);

@@ -19,7 +19,7 @@ interface Transaction {
     amount: number;
 }
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 function SkeletonRow() {
     return (
@@ -54,7 +54,6 @@ export default function LedgerPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [dirFilter, setDirFilter] = useState<'all' | 'in' | 'out'>('all');
     const [pocketFilter, setPocketFilter] = useState('all');
@@ -75,8 +74,8 @@ export default function LedgerPage() {
         return c.id;
     }, [router]);
 
-    const fetchPage = useCallback(async (cId: string, p: number, replace = false) => {
-        if (replace) setLoading(true); else setLoadingMore(true);
+    const fetchPage = useCallback(async (cId: string, p: number) => {
+        setLoading(true);
         try {
             const res = await api.get<any>(`/communities/${cId}/transactions?page=${p}&limit=${PAGE_SIZE}`);
             const rows: Transaction[] = (res.data || []).map((t: any) => ({
@@ -92,7 +91,7 @@ export default function LedgerPage() {
                 status: t.status || 'confirmed',
                 amount: Number(t.amount),
             }));
-            setTransactions(prev => replace ? rows : [...prev, ...rows]);
+            setTransactions(rows);
             setTotal(res.total || 0);
             setTotalPages(res.totalPages || 1);
             setPage(p);
@@ -100,20 +99,17 @@ export default function LedgerPage() {
             console.error('Failed to load ledger', err);
         } finally {
             setLoading(false);
-            setLoadingMore(false);
         }
     }, []);
 
     useEffect(() => {
         fetchCommunity().then(cId => {
-            if (cId) fetchPage(cId, 1, true);
+            if (cId) fetchPage(cId, 1);
         });
     }, []);
 
-    const handleLoadMore = () => {
-        if (page < totalPages && !loadingMore && communityId) {
-            fetchPage(communityId, page + 1, false);
-        }
+    const goToPage = (p: number) => {
+        if (communityId) fetchPage(communityId, p);
     };
 
     const filtered = transactions.filter(t => {
@@ -138,7 +134,7 @@ export default function LedgerPage() {
                     </p>
                 </div>
                 <button
-                    onClick={() => communityId && fetchPage(communityId, 1, true)}
+                    onClick={() => communityId && fetchPage(communityId, 1)}
                     className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition cursor-pointer shadow-sm self-start"
                 >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
@@ -284,41 +280,21 @@ export default function LedgerPage() {
                 </div>
 
                 {/* Load More Footer */}
-                {!loading && (
-                    <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
-                        <span className="text-[10px] font-semibold text-slate-400">
-                            Menampilkan {transactions.length} dari {total} transaksi
-                            {(searchQuery || dirFilter !== 'all' || pocketFilter !== 'all') && ` • ${filtered.length} setelah filter`}
+                {total > 0 && (
+                    <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
+                        <button
+                            onClick={() => goToPage(page - 1)}
+                            disabled={page <= 1 || loading}
+                            className="px-3 py-1.5 text-xs font-bold border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                        >← Sebelumnya</button>
+                        <span className="text-[10px] text-gray-400">
+                            Hal. {page} / {totalPages} · {total} transaksi
                         </span>
-                        {page < totalPages ? (
-                            <button
-                                onClick={handleLoadMore}
-                                disabled={loadingMore}
-                                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer disabled:opacity-50 shadow-sm"
-                            >
-                                {loadingMore ? (
-                                    <>
-                                        <svg className="animate-spin w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                        </svg>
-                                        Memuat...
-                                    </>
-                                ) : (
-                                    <>
-                                        Muat 25 berikutnya
-                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
-                                            {Math.min(25, total - transactions.length)} lagi
-                                        </span>
-                                    </>
-                                )}
-                            </button>
-                        ) : total > 0 && (
-                            <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
-                                <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                                Semua transaksi sudah dimuat
-                            </span>
-                        )}
+                        <button
+                            onClick={() => goToPage(page + 1)}
+                            disabled={page >= totalPages || loading}
+                            className="px-3 py-1.5 text-xs font-bold border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                        >Berikutnya →</button>
                     </div>
                 )}
             </div>

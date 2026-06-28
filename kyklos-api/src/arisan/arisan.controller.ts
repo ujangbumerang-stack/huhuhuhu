@@ -20,7 +20,10 @@ export class ArisanController {
   @Post('participants')
   async addParticipant(@Param('pocketId') pocketId: string, @Request() req: any, @Body() body: any) {
     const pocket = await this.prisma.pocket.findUnique({ where: { id: pocketId } });
-    return this.svc.addParticipant(pocketId, pocket!.communityId, body.memberId);
+    // memberId bisa berupa Membership.id atau User.id — resolve ke User.id
+    const membership = await this.prisma.membership.findUnique({ where: { id: body.memberId } });
+    const userId = membership?.userId ?? body.memberId;
+    return this.svc.addParticipant(pocketId, pocket!.communityId, userId);
   }
 
   @Get('periods')

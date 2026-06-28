@@ -37,6 +37,9 @@ export default function ContributionsPage() {
     const [loading, setLoading] = useState(true);
 
     const [myContributions, setMyContributions] = useState<Contribution[]>([]);
+    const [myPage, setMyPage] = useState(0);
+    const [allPage, setAllPage] = useState(0);
+    const PAGE_SIZE = 10;
     const [showNewDueModal, setShowNewDueModal] = useState(false);
     const [newDueForm, setNewDueForm] = useState({
         title: '', amount: '', dueDate: '', frequency: 'monthly', isMandatory: true, pocketId: ''
@@ -158,69 +161,80 @@ export default function ContributionsPage() {
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-                {dues.map(d => (
-                    <div key={d.id} className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm space-y-4 relative">
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <h3 className="font-serif text-lg font-bold text-slate-800">{d.title}</h3>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">{d.period ?? d.frequency}</p>
+            {isAdmin && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+                    {dues.map(d => (
+                        <div key={d.id} className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm space-y-4 relative">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <h3 className="font-serif text-lg font-bold text-slate-800">{d.title}</h3>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">{d.period ?? d.frequency}</p>
+                                </div>
                             </div>
-                        </div>
-                        <div>
-                            <p className="font-serif text-2xl font-black text-primary">{idr(d.amount)}</p>
-                        </div>
-                        {isAdmin && (
+                            <div>
+                                <p className="font-serif text-2xl font-black text-primary">{idr(d.amount)}</p>
+                            </div>
                             <button
                                 onClick={() => handleGenerate(d.id)}
                                 className="w-full py-2 bg-sky-50 text-[#0284C7] rounded-xl text-xs font-bold hover:bg-sky-100 transition cursor-pointer"
                             >
                                 Generate Invoices for Members
                             </button>
-                        )}
-                    </div>
-                ))}
-                {dues.length === 0 && !loading && (
-                    <div className="col-span-full py-8 text-center text-gray-400 text-sm">
-                        Belum ada jenis iuran yang dibuat.
+                        </div>
+                    ))}
+                    {dues.length === 0 && !loading && (
+                        <div className="col-span-full py-8 text-center text-gray-400 text-sm">
+                            Belum ada jenis iuran yang dibuat.
+                        </div>
+                    )}
+                </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/20">
+                    <h3 className="font-serif text-base font-bold text-slate-800 tracking-tight">Tagihan Saya</h3>
+                </div>
+                <div className="divide-y divide-gray-50">
+                    {loading ? (
+                        <div className="px-6 py-8 text-center text-xs text-gray-400">Memuat tagihan...</div>
+                    ) : myContributions.length === 0 ? (
+                        <div className="px-6 py-8 text-center text-xs text-gray-400">Tidak ada tagihan untuk Anda saat ini.</div>
+                    ) : myContributions.slice(myPage * PAGE_SIZE, (myPage + 1) * PAGE_SIZE).map(c => (
+                        <div key={c.id} className="px-6 py-4 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="text-sm font-bold text-slate-800 truncate">{c.schedule?.title}</p>
+                                <p className="text-xs text-gray-400 font-medium">{idr(c.amount)}</p>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                                    c.status === 'paid' || c.status === 'verified' ? 'bg-emerald-50 text-emerald-700' :
+                                    c.status === 'pending_verify' ? 'bg-amber-50 text-amber-700' :
+                                    'bg-rose-50 text-rose-600'
+                                }`}>
+                                    {c.status === 'pending_verify' ? 'MENUNGGU VERIFIKASI' : c.status.toUpperCase()}
+                                </span>
+                                {(c.status === 'pending' || c.status === 'unpaid') && (
+                                    <button
+                                        onClick={() => openPayTab(c)}
+                                        className="px-3 py-1.5 bg-primary text-white rounded-lg text-[10px] font-bold hover:brightness-90 transition cursor-pointer"
+                                    >
+                                        Bayar →
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {myContributions.length > 0 && (
+                    <div className="flex items-center justify-between px-6 py-3 border-t border-gray-50">
+                        <button onClick={() => setMyPage(p => Math.max(0, p - 1))} disabled={myPage === 0}
+                            className="px-3 py-1.5 text-xs font-bold border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">← Sebelumnya</button>
+                        <span className="text-[10px] text-gray-400">Hal. {myPage + 1} / {Math.max(1, Math.ceil(myContributions.length / PAGE_SIZE))}</span>
+                        <button onClick={() => setMyPage(p => Math.min(Math.ceil(myContributions.length / PAGE_SIZE) - 1, p + 1))} disabled={(myPage + 1) * PAGE_SIZE >= myContributions.length}
+                            className="px-3 py-1.5 text-xs font-bold border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">Berikutnya →</button>
                     </div>
                 )}
             </div>
-
-            {myContributions.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/20">
-                        <h3 className="font-serif text-base font-bold text-slate-800 tracking-tight">Tagihan Saya</h3>
-                    </div>
-                    <div className="divide-y divide-gray-50">
-                        {myContributions.map(c => (
-                            <div key={c.id} className="px-6 py-4 flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-bold text-slate-800">{c.schedule?.title}</p>
-                                    <p className="text-xs text-gray-400 font-medium">{idr(c.amount)}</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
-                                        c.status === 'paid' || c.status === 'verified' ? 'bg-emerald-50 text-emerald-700' :
-                                        c.status === 'pending_verify' ? 'bg-amber-50 text-amber-700' :
-                                        'bg-rose-50 text-rose-600'
-                                    }`}>
-                                        {c.status === 'pending_verify' ? 'MENUNGGU VERIFIKASI' : c.status.toUpperCase()}
-                                    </span>
-                                    {(c.status === 'pending' || c.status === 'unpaid') && (
-                                        <button
-                                            onClick={() => openPayTab(c)}
-                                            className="px-3 py-1.5 bg-primary text-white rounded-lg text-[10px] font-bold hover:brightness-90 transition cursor-pointer"
-                                        >
-                                            Bayar →
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
 
             {isAdmin && <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden mt-6">
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/20">
@@ -242,7 +256,7 @@ export default function ContributionsPage() {
                                 <tr><td colSpan={5} className="px-6 py-10 text-center text-xs text-gray-400">Loading...</td></tr>
                             ) : contributions.length === 0 ? (
                                 <tr><td colSpan={5} className="px-6 py-10 text-center text-xs text-gray-400 font-medium">Tidak ada data tagihan.</td></tr>
-                            ) : contributions.map(c => (
+                            ) : contributions.slice(allPage * PAGE_SIZE, (allPage + 1) * PAGE_SIZE).map(c => (
                                 <tr key={c.id} className="hover:bg-gray-50/30 transition duration-150">
                                     <td className="px-6 py-3.5">
                                         <p className="text-xs font-bold text-slate-800">{c.member?.name || 'Unknown'}</p>
@@ -278,6 +292,15 @@ export default function ContributionsPage() {
                         </tbody>
                     </table>
                 </div>
+                {contributions.length > 0 && (
+                    <div className="flex items-center justify-between px-6 py-3 border-t border-gray-50">
+                        <button onClick={() => setAllPage(p => Math.max(0, p - 1))} disabled={allPage === 0}
+                            className="px-3 py-1.5 text-xs font-bold border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">← Sebelumnya</button>
+                        <span className="text-[10px] text-gray-400">Hal. {allPage + 1} / {Math.max(1, Math.ceil(contributions.length / PAGE_SIZE))}</span>
+                        <button onClick={() => setAllPage(p => Math.min(Math.ceil(contributions.length / PAGE_SIZE) - 1, p + 1))} disabled={(allPage + 1) * PAGE_SIZE >= contributions.length}
+                            className="px-3 py-1.5 text-xs font-bold border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">Berikutnya →</button>
+                    </div>
+                )}
             </div>}
 
             {showNewDueModal && (

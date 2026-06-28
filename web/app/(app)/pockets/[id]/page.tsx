@@ -47,16 +47,9 @@ export default function PocketDetailPage() {
         notes: ''
     });
     const [activeTab, setActiveTab] = useState<'deposit' | 'expense' | 'disburse'>('deposit');
+    const [txPage, setTxPage] = useState(0);
+    const TX_PAGE_SIZE = 10;
 
-    // Pocket Settings states
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [editForm, setEditForm] = useState({
-        name: '',
-        description: '',
-        vaNumber: '',
-        vaName: ''
-    });
-    const [updatingPocket, setUpdatingPocket] = useState(false);
 
     const getPocketVA = (p: Pocket) => {
         if (p.vaNumber) return p.vaNumber;
@@ -107,28 +100,6 @@ export default function PocketDetailPage() {
         } finally {
             setLoading(false);
             setLoadingTxns(false);
-        }
-    };
-
-    const handleEditSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!editForm.name.trim()) return;
-        setUpdatingPocket(true);
-        try {
-            await api.patch(`/pockets/${pocketId}`, {
-                name: editForm.name,
-                description: editForm.description,
-                vaNumber: editForm.vaNumber || null,
-                vaName: editForm.vaName || null
-            });
-            setShowEditModal(false);
-            // Reload pocket detail
-            const updatedPocket = await api.get<Pocket>(`/pockets/${pocketId}`);
-            setPocket(updatedPocket);
-        } catch (err: any) {
-            alert(err.message || 'Gagal mengubah pengaturan kantong.');
-        } finally {
-            setUpdatingPocket(false);
         }
     };
 
@@ -288,11 +259,11 @@ export default function PocketDetailPage() {
             </button>
 
             {/* ── Header Title ── */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-4">
-                <div className="space-y-0.5">
-                    <div className="flex items-center gap-3">
-                        <h1 className="font-serif text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">{pocket.name}</h1>
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border-b border-gray-100 pb-4">
+                <div className="space-y-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h1 className="font-serif text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-tight">{pocket.name}</h1>
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0 ${
                             pocket.type === 'KAS' ? 'bg-sky-50 text-sky-700 border border-sky-100' :
                             pocket.type === 'ARISAN' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' :
                             'bg-rose-50 text-rose-700 border border-rose-100'
@@ -303,23 +274,15 @@ export default function PocketDetailPage() {
                     <p className="text-xs text-gray-400 font-semibold">{pocket.description || 'Tidak ada deskripsi untuk kantong ini.'}</p>
                 </div>
                 {role === 'admin' && (
-                    <button 
-                        onClick={() => {
-                            setEditForm({
-                                name: pocket.name,
-                                description: pocket.description || '',
-                                vaNumber: pocket.vaNumber || '',
-                                vaName: pocket.vaName || ''
-                            });
-                            setShowEditModal(true);
-                        }}
-                        className="px-3.5 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-2 shadow-sm hover:shadow-md transition cursor-pointer select-none self-start sm:self-center"
+                    <button
+                        onClick={() => router.push(`/pockets/${pocketId}/settings`)}
+                        className="flex-shrink-0 self-start px-3.5 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-2 shadow-sm hover:shadow-md transition cursor-pointer select-none"
                     >
                         <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        Edit Pengaturan Kantong
+                        Pengaturan
                     </button>
                 )}
             </div>
@@ -409,40 +372,58 @@ export default function PocketDetailPage() {
 
                 {/* ── Kanan: Form Transaksi & Ledger (7 Cols) ── */}
                 <div className="lg:col-span-7 space-y-6">
-                    
-                    {/* Action Form Card */}
+
+                    {/* Info card untuk member di kantong ARISAN / IURAN */}
+                    {role !== 'admin' && (pocket.type === 'ARISAN' || pocket.type === 'IURAN') ? (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-4">
+                            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div className="space-y-2">
+                                <p className="text-sm font-black text-amber-800">
+                                    {pocket.type === 'ARISAN' ? 'Setoran Arisan' : 'Pembayaran Iuran'}
+                                </p>
+                                <p className="text-xs text-amber-700 leading-relaxed">
+                                    {pocket.type === 'ARISAN'
+                                        ? 'Setoran untuk kantong arisan dilakukan melalui menu Arisan, bukan langsung di sini.'
+                                        : 'Pembayaran tagihan iuran dilakukan melalui menu Tagihan, sesuai tagihan yang ditetapkan admin.'}
+                                </p>
+                                <button
+                                    onClick={() => router.push(pocket.type === 'ARISAN' ? '/arisan' : '/contributions')}
+                                    className="px-4 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 transition cursor-pointer"
+                                >
+                                    {pocket.type === 'ARISAN' ? 'Ke Menu Arisan →' : 'Ke Menu Tagihan →'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                    /* Action Form Card */
                     <div className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm space-y-4">
-                        
+
                         {/* Tab header */}
-                        <div className="flex border-b border-gray-100 pb-1">
-                            <button
-                                onClick={() => { setActiveTab('deposit'); setTxForm({ amount: '', notes: '' }); }}
-                                className={`flex-1 pb-3 text-xs font-bold text-center border-b-2 transition cursor-pointer ${
-                                    activeTab === 'deposit' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'
-                                }`}
-                            >
-                                Deposit Dana
-                            </button>
-                            {role === 'admin' && (
-                                <>
-                                    <button
-                                        onClick={() => { setActiveTab('expense'); setTxForm({ amount: '', notes: '' }); }}
-                                        className={`flex-1 pb-3 text-xs font-bold text-center border-b-2 transition cursor-pointer ${
-                                            activeTab === 'expense' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'
-                                        }`}
-                                    >
-                                        Catat Pengeluaran
-                                    </button>
-                                    <button
-                                        onClick={() => { setActiveTab('disburse'); setTxForm({ amount: String(pocket.balance), notes: '' }); }}
-                                        className={`flex-1 pb-3 text-xs font-bold text-center border-b-2 transition cursor-pointer ${
-                                            activeTab === 'disburse' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'
-                                        }`}
-                                    >
-                                        Tarik Dana
-                                    </button>
-                                </>
-                            )}
+                        <div className="flex border-b border-gray-100 -mx-5 px-5 overflow-x-auto scrollbar-none">
+                            {[
+                                { key: 'deposit', label: 'Deposit Dana' },
+                                ...(role === 'admin' ? [
+                                    { key: 'expense', label: 'Pengeluaran' },
+                                    { key: 'disburse', label: 'Tarik Dana' },
+                                ] : [])
+                            ].map(t => (
+                                <button
+                                    key={t.key}
+                                    onClick={() => {
+                                        setActiveTab(t.key as any);
+                                        setTxForm({ amount: t.key === 'disburse' ? String(pocket.balance) : '', notes: '' });
+                                    }}
+                                    className={`flex-shrink-0 pb-3 px-3 text-xs font-bold text-center border-b-2 transition cursor-pointer whitespace-nowrap ${
+                                        activeTab === t.key ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'
+                                    }`}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
                         </div>
 
                         {/* Form Content */}
@@ -533,154 +514,81 @@ export default function PocketDetailPage() {
                             )}
                         </form>
                     </div>
+                    )}
 
                     {/* Ledger / Riwayat Transaksi */}
-                    <div className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm flex flex-col">
-                        <h4 className="font-serif text-sm font-bold text-slate-800 tracking-tight pb-3 border-b border-gray-100 flex-shrink-0">Riwayat Catatan Kas</h4>
-                        
-                        <div className="divide-y divide-gray-50 max-h-[350px] overflow-y-auto pr-1">
+                    <div className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm">
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                            <h4 className="font-serif text-sm font-bold text-slate-800 tracking-tight">Riwayat Catatan Kas</h4>
+                            {pocketTxns.length > 0 && (
+                                <span className="text-[10px] text-gray-400 font-semibold">
+                                    {txPage * TX_PAGE_SIZE + 1}–{Math.min((txPage + 1) * TX_PAGE_SIZE, pocketTxns.length)} dari {pocketTxns.length}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="divide-y divide-gray-50">
                             {loadingTxns ? (
                                 <div className="py-10 text-center text-xs text-gray-400 font-medium animate-pulse">Memuat riwayat transaksi...</div>
                             ) : pocketTxns.length === 0 ? (
                                 <div className="py-12 text-center text-xs text-gray-400 font-medium">Belum ada riwayat transaksi pada kantong ini.</div>
-                            ) : (
-                                pocketTxns.map((tx) => {
-                                    const isIn = tx.direction === 'in';
-                                    return (
-                                        <div key={tx.id} className="py-3 flex items-center justify-between gap-3">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isIn ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
-                                                    {isIn ? (
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
-                                                        </svg>
-                                                    ) : (
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m0 0l7-7m-7 7l-7-7" />
-                                                        </svg>
-                                                    )}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-xs font-bold text-slate-800 truncate">{tx.note || 'Pencatatan Tanpa Keterangan'}</p>
-                                                    <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
-                                                        Oleh {tx.createdBy?.name || 'Sistem'} • {new Date(tx.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                    </p>
-                                                </div>
+                            ) : pocketTxns.slice(txPage * TX_PAGE_SIZE, (txPage + 1) * TX_PAGE_SIZE).map((tx) => {
+                                const isIn = tx.direction === 'in';
+                                return (
+                                    <div key={tx.id} className="py-3 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isIn ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
+                                                {isIn ? (
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
+                                                    </svg>
+                                                ) : (
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m0 0l7-7m-7 7l-7-7" />
+                                                    </svg>
+                                                )}
                                             </div>
-                                            <div className="text-right flex-shrink-0">
-                                                <p className={`text-xs font-extrabold ${isIn ? 'text-emerald-600' : 'text-slate-800'}`}>
-                                                    {isIn ? '+' : '-'} {idr(Number(tx.amount))}
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-bold text-slate-800 truncate">{tx.note || 'Pencatatan Tanpa Keterangan'}</p>
+                                                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
+                                                    Oleh {tx.createdBy?.name || 'Sistem'} • {new Date(tx.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                 </p>
                                             </div>
                                         </div>
-                                    );
-                                })
-                            )}
+                                        <div className="text-right flex-shrink-0">
+                                            <p className={`text-xs font-extrabold ${isIn ? 'text-emerald-600' : 'text-slate-800'}`}>
+                                                {isIn ? '+' : '-'} {idr(Number(tx.amount))}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
+
+                        {pocketTxns.length > 0 && (
+                            <div className="flex items-center justify-between pt-4 border-t border-gray-50 mt-2">
+                                <button
+                                    onClick={() => setTxPage(p => Math.max(0, p - 1))}
+                                    disabled={txPage === 0}
+                                    className="px-3 py-1.5 text-xs font-bold text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                                >
+                                    ← Sebelumnya
+                                </button>
+                                <span className="text-[10px] text-gray-400">Hal. {txPage + 1} / {Math.max(1, Math.ceil(pocketTxns.length / TX_PAGE_SIZE))}</span>
+                                <button
+                                    onClick={() => setTxPage(p => Math.min(Math.ceil(pocketTxns.length / TX_PAGE_SIZE) - 1, p + 1))}
+                                    disabled={(txPage + 1) * TX_PAGE_SIZE >= pocketTxns.length}
+                                    className="px-3 py-1.5 text-xs font-bold text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                                >
+                                    Berikutnya →
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
             </div>
 
-            {/* Modal Edit Pocket */}
-            {showEditModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-300 animate-fadeIn">
-                    <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl max-w-md w-full overflow-hidden flex flex-col transform transition-all scale-100">
-                        {/* Header */}
-                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                            <div className="space-y-0.5">
-                                <h3 className="font-serif text-lg font-black text-slate-800 tracking-tight">Pengaturan Kantong</h3>
-                                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Sesuaikan Informasi & Virtual Account</p>
-                            </div>
-                            <button 
-                                onClick={() => setShowEditModal(false)}
-                                className="w-8 h-8 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        {/* Form */}
-                        <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
-                            <div className="space-y-1">
-                                <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Nama Kantong</label>
-                                <input
-                                    type="text" required
-                                    value={editForm.name}
-                                    onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                                    placeholder="Masukkan nama kantong"
-                                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-primary text-slate-800 font-semibold"
-                                />
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Deskripsi Kantong</label>
-                                <textarea
-                                    rows={2}
-                                    value={editForm.description}
-                                    onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                                    placeholder="Masukkan deskripsi kegunaan kantong"
-                                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-primary text-slate-800 font-medium resize-none"
-                                />
-                            </div>
-
-                            <div className="border-t border-slate-100 my-4 pt-4 space-y-3">
-                                <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Auto-Routing Virtual Account (Nobu)</h4>
-                                
-                                <div className="space-y-1">
-                                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Kustom Nomor VA (Whitelabel)</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.vaNumber}
-                                        onChange={e => setEditForm({ ...editForm, vaNumber: e.target.value })}
-                                        placeholder="Contoh: 8802-5031-2099"
-                                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-primary text-slate-800 font-mono font-semibold"
-                                    />
-                                    <p className="text-[9px] text-slate-400 font-medium mt-0.5">Biarkan kosong untuk menggunakan nomor routing acak bawaan.</p>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Kustom Nama VA (Whitelabel)</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.vaName}
-                                        onChange={e => setEditForm({ ...editForm, vaName: e.target.value })}
-                                        placeholder="Contoh: KYK*ANJU*KAS ANJAY"
-                                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-primary text-slate-800 font-semibold"
-                                    />
-                                    <p className="text-[9px] text-slate-400 font-medium mt-0.5">Biarkan kosong untuk menggunakan nama default `KYK*NAMA_KOMUNITAS*NAMA_KANTONG`.</p>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3 pt-2">
-                                <button 
-                                    type="button" 
-                                    onClick={() => setShowEditModal(false)}
-                                    className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 rounded-xl font-bold text-xs text-slate-500 transition cursor-pointer text-center"
-                                >
-                                    Batal
-                                </button>
-                                <button 
-                                    type="submit" 
-                                    disabled={updatingPocket}
-                                    className="flex-1 py-2.5 bg-primary text-white rounded-xl font-bold text-xs hover:brightness-95 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                                >
-                                    {updatingPocket ? (
-                                        <>
-                                            <div className="animate-spin h-3.5 w-3.5 text-white border-2 border-white/20 border-t-white rounded-full" />
-                                            <span>Menyimpan...</span>
-                                        </>
-                                    ) : (
-                                        <span>Simpan Pengaturan</span>
-                                    )}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
