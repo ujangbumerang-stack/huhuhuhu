@@ -41,41 +41,12 @@ export default function PocketsPage() {
     };
 
     const [showNewPocketModal, setShowNewPocketModal] = useState(false);
-    const [showTransactionModal, setShowTransactionModal] = useState<{
-        type: 'deposit' | 'expense' | 'disburse';
-        pocketId?: string;
-    } | null>(null);
 
     const [newPocketForm, setNewPocketForm] = useState({
         name: '',
         type: 'KAS',
         description: '',
     });
-
-    const [txForm, setTxForm] = useState({
-        amount: '',
-        notes: ''
-    });
-
-    const [selectedPocket, setSelectedPocket] = useState<Pocket | null>(null);
-    const [pocketTxns, setPocketTxns] = useState<any[]>([]);
-    const [loadingTxns, setLoadingTxns] = useState(false);
-    const [paymentConfig, setPaymentConfig] = useState<any>(null);
-    const [submittingTx, setSubmittingTx] = useState(false);
-
-    const handleOpenDetail = async (p: Pocket) => {
-        setSelectedPocket(p);
-        setLoadingTxns(true);
-        try {
-            const txns = await api.get<any[]>(`/pockets/${p.id}/transactions`);
-            setPocketTxns(txns || []);
-        } catch (err) {
-            console.error('Failed to load pocket transactions', err);
-            setPocketTxns([]);
-        } finally {
-            setLoadingTxns(false);
-        }
-    };
 
     useEffect(() => {
         const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
@@ -92,12 +63,6 @@ export default function PocketsPage() {
             }
             setCommunityId(c.id);
             setCommunityName(c.name);
-
-            // Fetch payment config to check bank account details
-            api.get<any>(`/communities/${c.id}/payment-config`)
-                .then(cfg => setPaymentConfig(cfg || null))
-                .catch(err => console.error('Failed to load payment config', err));
-
             return api.get<Pocket[]>(`/communities/${c.id}/pockets`);
         }).then(res => {
             if (res) setPockets(res);
@@ -127,48 +92,7 @@ export default function PocketsPage() {
         }
     };
 
-    const handleTransactionSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!showTransactionModal?.pocketId || submittingTx) return;
 
-        const amountNum = parseFloat(txForm.amount) || 0;
-        if (amountNum <= 0) return;
-
-        const pId = showTransactionModal.pocketId;
-        const type = showTransactionModal.type;
-
-        setSubmittingTx(true);
-        try {
-            if (type === 'disburse') {
-                if (!paymentConfig || !paymentConfig.bankName || !paymentConfig.accountNumber) {
-                    alert('Harap atur rekening bank komunitas terlebih dahulu di pengaturan.');
-                    setSubmittingTx(false);
-                    return;
-                }
-                await api.post(`/pockets/${pId}/withdraw`, {
-                    amount: amountNum,
-                    note: txForm.notes || 'Pencairan dana',
-                    bankName: paymentConfig.bankName,
-                    accountNumber: paymentConfig.accountNumber,
-                    accountHolder: paymentConfig.accountHolder || 'Penerima'
-                });
-                alert('Permintaan penarikan telah diajukan dan berhasil diproses.');
-            } else {
-                await api.post(`/pockets/${pId}/transactions`, {
-                    amount: amountNum,
-                    type: type === 'deposit' ? 'in' : 'out',
-                    description: txForm.notes || 'Transaksi'
-                });
-            }
-            setShowTransactionModal(null);
-            setTxForm({ amount: '', notes: '' });
-            loadPockets();
-        } catch (err: any) {
-            alert(err.message || 'Gagal memproses transaksi.');
-        } finally {
-            setSubmittingTx(false);
-        }
-    };
 
     const handleDeletePocket = async (id: string) => {
         if (confirm('Apakah Anda yakin ingin menghapus kantong kas ini?')) {
@@ -350,7 +274,7 @@ export default function PocketsPage() {
                     return (
                         <div 
                             key={p.id} 
-                            onClick={() => handleOpenDetail(p)}
+                            onClick={() => router.push(`/pockets/${p.id}`)}
                             className="relative group pt-6 cursor-pointer select-none"
                         >
                             {/* Peeking Cash & Card inside the wallet */}
@@ -425,35 +349,13 @@ export default function PocketsPage() {
                                     <p className="truncate text-white/50 text-[8.5px] font-semibold">{getPocketVAName(communityName, p.name)}</p>
                                 </div>
 
-                                {/* Admin Action Buttons */}
-                                {role === 'admin' && (
-                                    <div className="flex flex-col gap-2 mt-auto relative z-10">
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowTransactionModal({ type: 'deposit', pocketId: p.id });
-                                                }}
-                                                className={`py-2 ${theme.btnPrimary} rounded-xl text-xs font-bold transition cursor-pointer shadow-sm`}
-                                            >Deposit</button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowTransactionModal({ type: 'expense', pocketId: p.id });
-                                                }}
-                                                className="py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-xs font-bold text-white transition cursor-pointer"
-                                            >Log Expense</button>
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setTxForm({ amount: String(p.balance), notes: '' });
-                                                setShowTransactionModal({ type: 'disburse', pocketId: p.id });
-                                            }}
-                                            className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/25 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-                                        >Tarik (Disburse)</button>
-                                    </div>
-                                )}
+                                {/* Click Action Indicator */}
+                                <div className="mt-auto pt-2 flex items-center justify-between text-[10px] font-bold text-white/55 relative z-10 border-t border-white/5">
+                                    <span>Kelola & Catatan Kas</span>
+                                    <svg className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </div>
                             </div>
                         </div>
                     );
@@ -503,229 +405,7 @@ export default function PocketsPage() {
                 </div>
             )}
 
-            {/* ── Modal: Transaksi ── */}
-            {showTransactionModal && (() => {
-                const isDisburse = showTransactionModal.type === 'disburse';
-                const hasBank = paymentConfig?.bankName && paymentConfig?.accountNumber;
 
-                return (
-                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4">
-                        <form
-                            onSubmit={handleTransactionSubmit}
-                            className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl space-y-4"
-                        >
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-serif text-lg font-bold">
-                                    {showTransactionModal.type === 'deposit' ? 'Deposit Dana' :
-                                        showTransactionModal.type === 'expense' ? 'Log Expense' :
-                                            'Tarik Dana'}
-                                </h3>
-                                <button type="button" onClick={() => setShowTransactionModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 cursor-pointer">
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </div>
-
-                            {isDisburse && !hasBank ? (
-                                <div className="space-y-4 text-center py-4">
-                                    <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto text-rose-500">
-                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <h4 className="font-bold text-slate-800 text-sm">Rekening Bank Belum Diatur</h4>
-                                        <p className="text-xs text-gray-500 px-4">
-                                            Harap atur rekening bank komunitas terlebih dahulu di pengaturan untuk melakukan penarikan dana.
-                                        </p>
-                                    </div>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => router.push('/settings')} 
-                                        className="w-full py-3 bg-primary text-white rounded-xl font-bold text-sm hover:brightness-90 transition cursor-pointer"
-                                    >
-                                        Atur Rekening Sekarang
-                                    </button>
-                                </div>
-                            ) : (
-                                <>
-                                    {showTransactionModal.type === 'deposit' && (() => {
-                                        const targetPocket = pockets.find(p => p.id === showTransactionModal.pocketId);
-                                        if (!targetPocket) return null;
-                                        return (
-                                            <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 text-xs text-slate-600 space-y-1">
-                                                <p className="font-bold text-slate-400 uppercase tracking-wider text-[8px]">Tujuan Transfer Virtual Account (Whitelabel Nobu):</p>
-                                                <p className="font-mono font-bold text-slate-800 text-sm tracking-wider">{getPocketVA(targetPocket)}</p>
-                                                <p className="font-semibold text-slate-700 text-[10px]">{getPocketVAName(communityName, targetPocket.name)}</p>
-                                                <p className="text-[9px] text-slate-400 font-medium leading-relaxed mt-1">Sistem whitelabel auto-routing akan langsung menyalurkan dana Anda ke pocket ini.</p>
-                                            </div>
-                                        );
-                                    })()}
-
-                                    {isDisburse && hasBank && (
-                                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs text-slate-600 space-y-1">
-                                            <p className="font-bold text-slate-700">Tujuan Transfer Bank Komunitas:</p>
-                                            <p className="font-semibold text-slate-800">{paymentConfig.bankName} - {paymentConfig.accountNumber}</p>
-                                            <p>A/N {paymentConfig.accountHolder}</p>
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-1">
-                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nominal Rupiah</label>
-                                        <input
-                                            type="number" required value={txForm.amount}
-                                            onChange={e => setTxForm({ ...txForm, amount: e.target.value })}
-                                            placeholder="Jumlah Rupiah"
-                                            className="w-full border border-slate-300 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-primary font-mono text-slate-800 font-bold"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Keterangan / Catatan</label>
-                                        <input
-                                            type="text" value={txForm.notes}
-                                            onChange={e => setTxForm({ ...txForm, notes: e.target.value })}
-                                            placeholder="Catatan Transaksi"
-                                            className="w-full border border-slate-300 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-primary"
-                                        />
-                                    </div>
-
-                                    <div className="flex gap-2 pt-1">
-                                        <button 
-                                            type="button" 
-                                            disabled={submittingTx}
-                                            onClick={() => setShowTransactionModal(null)} 
-                                            className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-sm text-slate-600 hover:bg-gray-200 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >Batal</button>
-                                        <button 
-                                            type="submit" 
-                                            disabled={submittingTx}
-                                            className="flex-1 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:brightness-90 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                        >
-                                            {submittingTx ? (
-                                                <>
-                                                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                                    </svg>
-                                                    <span>Memproses...</span>
-                                                </>
-                                            ) : 'Proses'}
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-                        </form>
-                    </div>
-                );
-            })()}
-
-            {/* ── Modal: Detail Kantong & Riwayat Transaksi ── */}
-            {selectedPocket && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4">
-                    <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl space-y-6 max-h-[85vh] sm:max-h-[80vh] flex flex-col">
-                        
-                        {/* Header Detail */}
-                        <div className="flex items-start justify-between flex-shrink-0">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-xl bg-slate-50 border border-gray-100 flex items-center justify-center">
-                                    {typeIcon[selectedPocket.type] ?? defaultIcon}
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="font-serif text-lg font-bold text-slate-800 leading-tight">{selectedPocket.name}</h3>
-                                        <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                            selectedPocket.type === 'KAS' ? 'bg-sky-50 text-sky-700' :
-                                            selectedPocket.type === 'ARISAN' ? 'bg-indigo-50 text-indigo-700' :
-                                            'bg-rose-50 text-rose-700'
-                                        }`}>
-                                            {selectedPocket.type}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-gray-400 font-semibold mt-1">{selectedPocket.description || 'Tidak ada deskripsi.'}</p>
-                                </div>
-                            </div>
-                            <button 
-                                type="button" 
-                                onClick={() => setSelectedPocket(null)} 
-                                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 cursor-pointer transition"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        {/* Balance Card */}
-                        <div className="bg-[#0B1E26]/5 border border-slate-200/50 rounded-2xl p-5 flex flex-col justify-between flex-shrink-0">
-                            <div>
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Dana Terkumpul</span>
-                                <p className="font-serif text-3xl font-black text-[#0B1E26] tracking-tight mt-1">{idr(selectedPocket.balance)}</p>
-                            </div>
-                        </div>
-
-                        {/* Whitelabel Bank Routing Card */}
-                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 space-y-2 flex-shrink-0">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Virtual Account Khusus Kantong (Whitelabel Nobu)</span>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="font-mono text-sm font-black text-slate-800 tracking-wider">{getPocketVA(selectedPocket)}</p>
-                                    <p className="text-[10px] font-bold text-slate-500 mt-0.5">{getPocketVAName(communityName, selectedPocket.name)}</p>
-                                </div>
-                                <span className="text-[9px] font-extrabold px-2 py-0.5 bg-sky-50 text-sky-700 rounded border border-sky-100 uppercase tracking-wider">Nobu Route</span>
-                            </div>
-                            <p className="text-[9.5px] text-slate-400 font-medium leading-relaxed">
-                                Setiap dana yang ditransfer ke VA ini akan otomatis didepositkan langsung ke kantong <strong>{selectedPocket.name}</strong>.
-                            </p>
-                        </div>
-
-                        {/* Transactions Section */}
-                        <div className="flex-1 flex flex-col min-h-0">
-                            <h4 className="font-serif text-sm font-bold text-slate-800 tracking-tight pb-3 border-b border-gray-100 flex-shrink-0">Riwayat Catatan Kas</h4>
-                            
-                            <div className="flex-1 overflow-y-auto pt-3 divide-y divide-gray-50 pr-1">
-                                {loadingTxns ? (
-                                    <div className="py-10 text-center text-xs text-gray-400 font-medium animate-pulse">Memuat riwayat transaksi...</div>
-                                ) : pocketTxns.length === 0 ? (
-                                    <div className="py-12 text-center text-xs text-gray-400 font-medium">Belum ada riwayat transaksi pada kantong ini.</div>
-                                ) : (
-                                    pocketTxns.map((tx) => {
-                                        const isIn = tx.direction === 'in';
-                                        return (
-                                            <div key={tx.id} className="py-3 flex items-center justify-between gap-3">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isIn ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
-                                                        {isIn ? (
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
-                                                            </svg>
-                                                        ) : (
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m0 0l7-7m-7 7l-7-7" />
-                                                            </svg>
-                                                        )}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-xs font-bold text-slate-800 truncate">{tx.note || 'Pencatatan Tanpa Keterangan'}</p>
-                                                        <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
-                                                            Oleh {tx.createdBy?.name || 'Sistem'} • {new Date(tx.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right flex-shrink-0">
-                                                    <p className={`text-xs font-extrabold ${isIn ? 'text-emerald-600' : 'text-slate-800'}`}>
-                                                        {isIn ? '+' : '-'} {idr(Number(tx.amount))}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
