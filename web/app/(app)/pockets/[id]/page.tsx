@@ -157,9 +157,9 @@ export default function PocketDetailPage() {
 
     if (loading || !pocket) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-3">
-                <div className="animate-spin h-8 w-8 text-primary border-4 border-slate-200 border-t-primary rounded-full" />
-                <p className="text-xs text-gray-400 font-semibold">Memuat Detail Kantong...</p>
+            <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
+                <div className="w-10 h-10 border-4 border-slate-200 rounded-full animate-spin" style={{ borderTopColor: 'var(--community-primary, #0B1E26)' }} />
+                <p className="text-sm font-bold text-slate-400 animate-pulse tracking-wide">Memuat Detail Kantong...</p>
             </div>
         );
     }
@@ -529,7 +529,10 @@ export default function PocketDetailPage() {
 
                         <div className="divide-y divide-gray-50">
                             {loadingTxns ? (
-                                <div className="py-10 text-center text-xs text-gray-400 font-medium animate-pulse">Memuat riwayat transaksi...</div>
+                                <div className="py-10 flex flex-col items-center justify-center gap-2">
+                                    <div className="w-6 h-6 border-3 border-slate-100 rounded-full animate-spin" style={{ borderTopColor: 'var(--community-primary, #0B1E26)' }} />
+                                    <span className="text-xs font-bold text-slate-400 animate-pulse">Memuat riwayat transaksi...</span>
+                                </div>
                             ) : pocketTxns.length === 0 ? (
                                 <div className="py-12 text-center text-xs text-gray-400 font-medium">Belum ada riwayat transaksi pada kantong ini.</div>
                             ) : pocketTxns.slice(txPage * TX_PAGE_SIZE, (txPage + 1) * TX_PAGE_SIZE).map((tx) => {

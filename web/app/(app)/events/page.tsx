@@ -12,7 +12,6 @@ interface Event {
     date: string;
     eventDate?: string;
     location: string;
-    isOnline: boolean;
     bannerUrl?: string;
     imageUrl?: string;
 }
@@ -27,7 +26,7 @@ export default function EventsPage() {
     const [showNewEventModal, setShowNewEventModal] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
     const [newEventForm, setNewEventForm] = useState({
-        title: '', description: '', date: '', location: '', isOnline: false, imageUrl: ''
+        title: '', description: '', date: '', location: '', imageUrl: ''
     });
 
     const loadData = async () => {
@@ -73,11 +72,10 @@ export default function EventsPage() {
                 description: newEventForm.description,
                 date: newEventForm.date || new Date().toISOString(),
                 location: newEventForm.location,
-                isOnline: newEventForm.isOnline,
                 imageUrl: newEventForm.imageUrl
             });
             setShowNewEventModal(false);
-            setNewEventForm({ title: '', description: '', date: '', location: '', isOnline: false, imageUrl: '' });
+            setNewEventForm({ title: '', description: '', date: '', location: '', imageUrl: '' });
             loadData();
         } catch (err: any) {
             alert(err.message || 'Gagal membuat event');
@@ -103,7 +101,12 @@ export default function EventsPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-                {loading && <div className="col-span-full py-8 text-center text-xs text-gray-400">Memuat agenda...</div>}
+                {loading && (
+                    <div className="col-span-full py-12 flex flex-col items-center justify-center gap-3">
+                        <div className="w-8 h-8 border-4 border-slate-100 rounded-full animate-spin" style={{ borderTopColor: 'var(--community-primary, #0B1E26)' }} />
+                        <span className="text-xs font-bold text-slate-400 animate-pulse">Memuat agenda...</span>
+                    </div>
+                )}
                 
                 {!loading && events.length === 0 && (
                     <div className="col-span-full py-8 text-center text-gray-400 text-sm">
@@ -124,9 +127,6 @@ export default function EventsPage() {
                                 <div className="w-full h-full bg-gradient-to-tr from-sky-100 to-indigo-50 flex items-center justify-center text-slate-300">
                                     <svg className="w-10 h-10 group-hover:scale-110 transition duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                 </div>
-                            )}
-                            {ev.isOnline && (
-                                <div className="absolute top-3 left-3 bg-indigo-500 text-white text-[9px] font-bold px-2 py-1 rounded-md shadow-sm">ONLINE</div>
                             )}
                         </div>
                         <div className="p-5 flex-1 flex flex-col">
@@ -219,17 +219,9 @@ export default function EventsPage() {
                         <input 
                             type="text" required value={newEventForm.location}
                             onChange={e => setNewEventForm({ ...newEventForm, location: e.target.value })}
-                            placeholder="Lokasi (contoh: Cafe Seketika, Semarang)"
+                            placeholder="Lokasi (contoh: Cafe Seketika, Semarang / GMeet URL)"
                             className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
                         />
-                        <label className="flex items-center gap-2 text-sm text-slate-700">
-                            <input 
-                                type="checkbox" checked={newEventForm.isOnline}
-                                onChange={e => setNewEventForm({ ...newEventForm, isOnline: e.target.checked })}
-                                className="w-4 h-4 rounded text-primary focus:ring-primary"
-                            />
-                            Acara Online?
-                        </label>
                         <div className="flex gap-2 pt-2">
                             <button type="button" onClick={() => setShowNewEventModal(false)} className="flex-1 py-2 bg-gray-100 rounded-xl font-bold text-sm">Batal</button>
                             <button type="submit" className="flex-1 py-2 bg-primary text-white rounded-xl font-bold text-sm">Buat</button>

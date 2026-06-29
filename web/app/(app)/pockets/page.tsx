@@ -230,20 +230,20 @@ export default function PocketsPage() {
             {/* ── Total Liquidity Card ── */}
             <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm w-full sm:max-w-xs">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Saldo Semua Kantong</span>
-                <p className="font-serif text-2xl font-black text-slate-800 tracking-tight mt-2">
-                    {loading ? '—' : idr(totalLiquidity)}
+                <p className="font-serif text-2xl font-black text-slate-800 tracking-tight mt-2 flex items-center h-8">
+                    {loading ? (
+                        <span className="inline-block w-5 h-5 border-2 border-slate-200 rounded-full animate-spin" style={{ borderTopColor: 'var(--community-primary, #0B1E26)' }} />
+                    ) : idr(totalLiquidity)}
                 </p>
             </div>
 
             {/* ── Pocket Cards Grid ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {loading ? (
-                    [1, 2, 3].map(i => (
-                        <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 h-40 animate-pulse">
-                            <div className="h-3 bg-slate-100 rounded w-1/2 mb-3" />
-                            <div className="h-5 bg-slate-100 rounded w-3/4" />
-                        </div>
-                    ))
+                    <div className="col-span-full py-16 flex flex-col items-center justify-center gap-3">
+                        <div className="w-8 h-8 border-4 border-slate-100 rounded-full animate-spin" style={{ borderTopColor: 'var(--community-primary, #0B1E26)' }} />
+                        <span className="text-xs font-bold text-slate-400 animate-pulse">Memuat kantong kas...</span>
+                    </div>
                 ) : pockets.length === 0 ? (
                     <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
                         <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">

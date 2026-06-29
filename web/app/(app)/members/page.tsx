@@ -178,7 +178,14 @@ export default function MembersPage() {
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {loading ? (
-                                <tr><td colSpan={4} className="px-6 py-10 text-center text-xs text-gray-400">Memuat...</td></tr>
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-10 text-center">
+                                        <div className="flex flex-col items-center justify-center gap-2">
+                                            <div className="w-6 h-6 border-3 border-slate-100 rounded-full animate-spin" style={{ borderTopColor: 'var(--community-primary, #0B1E26)' }} />
+                                            <span className="text-xs font-bold text-slate-400 animate-pulse">Memuat anggota...</span>
+                                        </div>
+                                    </td>
+                                </tr>
                             ) : filteredMembers.length === 0 ? (
                                 <tr>
                                     <td colSpan={4} className="px-6 py-10 text-center text-xs text-gray-400 font-medium">

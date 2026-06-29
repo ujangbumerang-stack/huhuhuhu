@@ -1,6 +1,6 @@
 'use client';
  
-import { useEffect, useState, useContext } from 'react';
+import { useEffect, useState, useContext, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
@@ -9,23 +9,37 @@ import { CommunityContext } from '../layout';
 
 interface DashboardData {
     totalBalance: string;
-    pockets: Array<{ id: string; name: string; type: string; balance: string; status?: string }>;
+    monthlyInflow: string;
+    monthlyOutflow: string;
+    pockets: Array<{ id: string; name: string; type: string; balance: string }>;
     recentTransactions: Array<{
         id: string;
         amount: string;
         direction: string;
         note?: string;
         createdAt: string;
-        member?: { name: string };
+        member?: { name: string; avatarUrl?: string };
+        pocket?: { name: string };
     }>;
     members: Array<{ userId: string; role: string; user: { id: string; name: string } }>;
-    pendingVerifications?: Array<{
+    pendingVerifications: Array<{
         id: string;
         member: { name: string; avatar: string; color: string; avatarUrl?: string | null };
         date: string;
         amount: number;
         pocket: string;
         pocketId: string;
+    }>;
+    pendingWithdrawals: Array<{
+        id: string;
+        amount: string;
+        user: { name: string };
+        pocket: { name: string };
+    }>;
+    joinRequests: Array<{
+        id: string;
+        user: { name: string };
+        event: { title: string };
     }>;
 }
 
@@ -36,8 +50,10 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState<boolean>(true);
     const [verifyingId, setVerifyingId] = useState<string | null>(null);
     const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+    const chartContainerRef = useRef<HTMLDivElement>(null);
 
     const { role } = useContext(CommunityContext);
+    const isAdmin = role === 'admin';
 
     const loadDashboard = async () => {
         setLoading(true);
@@ -59,7 +75,6 @@ export default function DashboardPage() {
 
     useEffect(() => {
         loadDashboard();
-        // Refresh otomatis saat tab pembayaran selesai
         const onStorage = (e: StorageEvent) => {
             if (e.key === 'kyklos_payment_done') loadDashboard();
         };
@@ -67,7 +82,12 @@ export default function DashboardPage() {
         return () => window.removeEventListener('storage', onStorage);
     }, []);
 
-    // Verifikasi pembayaran warga secara langsung
+    useEffect(() => {
+        if (!loading && data && chartContainerRef.current) {
+            chartContainerRef.current.scrollLeft = chartContainerRef.current.scrollWidth;
+        }
+    }, [loading, data]);
+
     const handleVerify = async (id: string) => {
         setVerifyingId(id);
         try {
@@ -86,16 +106,16 @@ export default function DashboardPage() {
             d.setMonth(d.getMonth() - offset);
             return d.toLocaleDateString('id-ID', { month: 'short' });
         };
-        const months = Array.from({ length: 6 }, (_, i) => getMonthLabel(5 - i));
+        const months = Array.from({ length: 12 }, (_, i) => getMonthLabel(11 - i));
 
         const now = new Date();
-        const targetMonths = Array.from({ length: 6 }, (_, i) => {
-            const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+        const targetMonths = Array.from({ length: 12 }, (_, i) => {
+            const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
             return { year: d.getFullYear(), month: d.getMonth() };
         });
 
-        const realInflow = [0, 0, 0, 0, 0, 0];
-        const realOutflow = [0, 0, 0, 0, 0, 0];
+        const realInflow = Array(12).fill(0);
+        const realOutflow = Array(12).fill(0);
 
         (data?.recentTransactions || []).forEach((t: any) => {
             const txDate = new Date(t.createdAt);
@@ -110,8 +130,8 @@ export default function DashboardPage() {
             }
         });
 
-        const baseInflow = [350000, 500000, 450000, 650000, 850000, 1100000];
-        const baseOutflow = [120000, 200000, 150000, 300000, 450000, 250000];
+        const baseInflow = [250000, 300000, 400000, 350000, 420000, 480000, 350000, 500000, 450000, 650000, 850000, 1100000];
+        const baseOutflow = [100000, 150000, 120000, 200000, 180000, 220000, 120000, 200000, 150000, 300000, 450000, 250000];
 
         const inflowData = baseInflow.map((mockVal, idx) => {
             return realInflow[idx] > 0 ? realInflow[idx] : mockVal;
@@ -123,25 +143,25 @@ export default function DashboardPage() {
 
         const maxVal = Math.max(...inflowData, ...outflowData, 100000) * 1.15;
         const chartHeight = 110;
-        const chartWidth = 320;
+        const chartWidth = 650;
 
         const getY = (val: number) => {
             return chartHeight - (val / maxVal) * (chartHeight - 20) - 10;
         };
 
         const getX = (idx: number) => {
-            return 25 + idx * ((chartWidth - 45) / 5);
+            return 25 + idx * ((chartWidth - 45) / 11);
         };
 
         const inflowPoints = inflowData.map((val, idx) => `${getX(idx)},${getY(val)}`).join(' ');
         const outflowPoints = outflowData.map((val, idx) => `${getX(idx)},${getY(val)}`).join(' ');
 
-        const inflowAreaPoints = `25,${chartHeight} ${inflowPoints} ${getX(5)},${chartHeight}`;
-        const outflowAreaPoints = `25,${chartHeight} ${outflowPoints} ${getX(5)},${chartHeight}`;
+        const inflowAreaPoints = `25,${chartHeight} ${inflowPoints} ${getX(11)},${chartHeight}`;
+        const outflowAreaPoints = `25,${chartHeight} ${outflowPoints} ${getX(11)},${chartHeight}`;
 
         return (
-            <div className="relative w-full h-[120px] select-none">
-                <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-full overflow-visible">
+            <div className="relative w-full h-[130px] select-none">
+                <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-full overflow-visible" role="img" aria-label="Grafik Tren Arus Kas 12 Bulan">
                     <defs>
                         <linearGradient id="primaryGrad" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="var(--community-primary)" stopOpacity="0.35" />
@@ -172,9 +192,13 @@ export default function DashboardPage() {
                             fill="#FFFFFF"
                             stroke="var(--community-primary)"
                             strokeWidth={hoveredIdx === idx ? 3.5 : 2.5}
-                            className="transition-all duration-150 cursor-pointer"
+                            className="transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--community-primary)]"
+                            tabIndex={0}
+                            aria-label={`Bulan ${months[idx]}, Pemasukan ${idr(val)}, Pengeluaran ${idr(outflowData[idx])}`}
                             onMouseEnter={() => setHoveredIdx(idx)}
                             onMouseLeave={() => setHoveredIdx(null)}
+                            onFocus={() => setHoveredIdx(idx)}
+                            onBlur={() => setHoveredIdx(null)}
                         />
                     ))}
 
@@ -219,86 +243,136 @@ export default function DashboardPage() {
 
     if (loading || !data) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-[#F8FAFC] text-gray-500 text-sm">
-                Memuat dasbor...
+            <div className="flex items-center justify-center min-h-screen bg-[#F8FAFC]">
+                <div className="flex flex-col items-center gap-3">
+                    <svg className="animate-spin w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span className="text-sm font-semibold text-gray-500">Memuat dasbor...</span>
+                </div>
             </div>
         );
     }
 
-    const getPocketIcon = (type: string) => {
-        switch (type) {
-            case 'treasury':
-                return (
-                    <svg className="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                );
-            case 'arisan':
-                return (
-                    <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                );
-            default:
-                return (
-                    <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                    </svg>
-                );
-        }
-    };
-
     return (
         <div className="space-y-6">
-            {/* Bagian Overview Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="font-serif text-3xl font-black text-slate-800 tracking-tight">Overview</h1>
-                    <p className="text-xs sm:text-sm text-gray-400 font-medium">Real-time snapshot of community health.</p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-slate-700 hover:bg-gray-50 transition shadow-sm bg-white cursor-pointer select-none">
-                        <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Export
-                    </button>
+                    <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Overview</h1>
+                    <p className="text-xs sm:text-sm text-gray-400 font-medium">Ringkasan aktivitas dan kondisi komunitas.</p>
                 </div>
             </div>
 
-            {/* Grid Metrik Utama */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Total Balance Card & Cashflow Area Chart */}
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-6">
-                    <div className="md:col-span-2 flex flex-col justify-between">
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
-                                Total Community Balance
-                            </div>
-                            <p className="font-serif text-3xl font-extrabold text-slate-900 tracking-tight">
-                                {idr(data.totalBalance)}
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-2 mt-6 text-xs font-semibold">
-                            <span className="flex items-center gap-0.5 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">
-                                <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                                </svg>
-                                +12% this month
-                            </span>
-                            <span className="text-gray-400">vs last month</span>
+            {/* TOP METRICS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Saldo</span>
+                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
                     </div>
+                    <p className="text-2xl font-bold text-slate-800 tracking-tight tabular-nums">{idr(data.totalBalance)}</p>
+                </div>
 
-                    {/* Chart Container */}
-                    <div className="md:col-span-3 relative flex flex-col justify-between min-h-[150px] border-l border-slate-100/80 pl-0 md:pl-6 pt-2">
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Pemasukan (Bulan Ini)</span>
+                        <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
+                        </div>
+                    </div>
+                    <p className="text-2xl font-bold text-emerald-600 tracking-tight tabular-nums">{idr(data.monthlyInflow)}</p>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Pengeluaran (Bulan Ini)</span>
+                        <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-500">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg>
+                        </div>
+                    </div>
+                    <p className="text-2xl font-bold text-rose-500 tracking-tight tabular-nums">{idr(data.monthlyOutflow)}</p>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Anggota Aktif</span>
+                        <div className="w-8 h-8 rounded-full bg-violet-50 flex items-center justify-center text-violet-500">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        </div>
+                    </div>
+                    <p className="text-2xl font-bold text-slate-800 tracking-tight tabular-nums">{data.members.length} Orang</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* ACTION ITEMS (ADMIN ONLY) OR RECENT ACTIVITY (MEMBER) */}
+                <div className="lg:col-span-2 space-y-6">
+                    {isAdmin && (data.pendingVerifications.length > 0 || data.pendingWithdrawals.length > 0) && (
+                        <div className="bg-white rounded-2xl border border-amber-200 p-0 shadow-sm overflow-hidden">
+                            <div className="bg-amber-50 px-5 py-3 border-b border-amber-100 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                    <h2 className="text-xs font-bold text-amber-800 uppercase tracking-wider">Menunggu Tindakan Admin</h2>
+                                </div>
+                                {data.pendingVerifications.length > 1 && (
+                                    <button 
+                                        onClick={async () => {
+                                            if (!confirm('Terima semua iuran ini?')) return;
+                                            setLoading(true);
+                                            try {
+                                                await Promise.all(data.pendingVerifications.map(v => api.post(`/contributions/${v.id}/verify`, {})));
+                                                loadDashboard();
+                                            } catch (err) {
+                                                console.error(err);
+                                            } finally {
+                                                setLoading(false);
+                                            }
+                                        }}
+                                        className="text-[10px] font-bold text-amber-700 bg-amber-100/50 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition"
+                                    >
+                                        Terima Semua ({data.pendingVerifications.length})
+                                    </button>
+                                )}
+                            </div>
+                            <div className="divide-y divide-gray-100">
+                                {data.pendingWithdrawals.map(w => (
+                                    <div key={w.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-800">Pencairan Dana: {idr(w.amount)}</p>
+                                            <p className="text-[10px] text-slate-500 font-medium">Dari {w.pocket.name} oleh {w.user.name}</p>
+                                        </div>
+                                        <Link href="/pockets" className="text-[10px] font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition">Review</Link>
+                                    </div>
+                                ))}
+                                {data.pendingVerifications.map(v => (
+                                    <div key={v.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition">
+                                        <div className="flex items-center gap-3">
+                                            {v.member.avatarUrl ? (
+                                                <img src={v.member.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                            ) : (
+                                                <div className={`w-8 h-8 rounded-full ${v.member.color} text-[10px] font-bold flex items-center justify-center`}>{v.member.avatar}</div>
+                                            )}
+                                            <div>
+                                                <p className="text-xs font-bold text-slate-800">Iuran {v.pocket}: {idr(v.amount)}</p>
+                                                <p className="text-[10px] text-slate-500 font-medium">{v.member.name} • {v.date}</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => handleVerify(v.id)}
+                                            disabled={verifyingId === v.id}
+                                            className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition disabled:opacity-50"
+                                        >
+                                            {verifyingId === v.id ? 'Memverifikasi...' : 'Terima'}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tren Arus Kas (6 Bln)</span>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tren Arus Kas (12 Bulan)</span>
                             <div className="flex gap-2.5 text-[9px] font-bold">
                                 <span className="flex items-center gap-1.5 text-slate-500">
                                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--community-primary)' }}></span> Masuk
@@ -308,180 +382,123 @@ export default function DashboardPage() {
                                 </span>
                             </div>
                         </div>
-
-                        <div className="flex-1 flex items-center justify-center">
-                            {renderChart()}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Action Required Card - Admin Only */}
-                {role === 'admin' && (
-                    <div className="bg-primary rounded-2xl p-6 shadow-sm flex flex-col justify-between text-white">
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-xs font-bold text-white/80 uppercase tracking-wider">
-                                <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                                </svg>
-                                Action Required
-                            </div>
-                            <h3 className="font-serif text-2xl font-bold tracking-tight text-white leading-tight">
-                                {data.pendingVerifications?.length ?? 0} Verifications Pending
-                            </h3>
-                            <p className="text-xs text-white/70 leading-relaxed">
-                                Requires immediate attention before end of month.
-                            </p>
-                        </div>
-
-                        <button 
-                            onClick={() => {
-                                const element = document.getElementById('pending-verifications');
-                                if (element) element.scrollIntoView({ behavior: 'smooth' });
-                            }}
-                            className="w-full mt-6 py-2.5 bg-white hover:bg-gray-50 text-primary font-bold rounded-xl text-xs transition duration-200 cursor-pointer text-center select-none"
-                        >
-                            Review Now
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            {/* Bagian Active Pockets */}
-            <div className="space-y-4">
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Active Pockets</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {data.pockets.map(p => {
-                        let fillBg = 'bg-primary';
-                        let percentage = 90;
-                        if (p.name === 'Arisan Bulanan') {
-                            fillBg = 'bg-primary';
-                            percentage = 100;
-                        } else if (p.name === 'Social Fund') {
-                            fillBg = 'bg-slate-500';
-                            percentage = 64;
-                        }
-
-                        return (
-                            <div key={p.id} 
-                                className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm hover:shadow-md transition duration-300 flex flex-col justify-between space-y-4 min-h-[140px]"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-gray-100 flex items-center justify-center">
-                                        {getPocketIcon(p.type)}
-                                    </div>
-                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                                        p.name === 'Arisan Bulanan' 
-                                            ? 'bg-orange-50 text-primary' 
-                                            : 'bg-sky-50 text-[#0284C7]'
-                                    }`}>
-                                        Active
-                                    </span>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{p.name}</p>
-                                    <p className="font-serif text-2xl font-black text-slate-800 tracking-tight">{idr(p.balance)}</p>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                        <div className={`h-full ${fillBg} rounded-full`} style={{ width: `${percentage}%` }}></div>
-                                    </div>
+                        <div className="relative">
+                            <div ref={chartContainerRef} className="overflow-x-auto overflow-y-hidden pb-2 cursor-grab active:cursor-grabbing hide-scrollbar">
+                                <div className="min-w-[650px] pr-8">
+                                    {renderChart()}
                                 </div>
                             </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Bagian Pending Verifications - Admin Only */}
-            {role === 'admin' && (
-                <div id="pending-verifications" className="space-y-4 pt-2">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Pending Verifications</h2>
-                        <Link href="/ledger" className="text-xs font-bold text-[#0284C7] hover:text-[#0369a1]">
-                            View All
-                        </Link>
+                            <div className="absolute top-0 right-0 bottom-2 w-16 bg-gradient-to-l from-white to-transparent pointer-events-none"></div>
+                        </div>
                     </div>
 
-                    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="border-b border-gray-100 bg-gray-50/50 text-[10px] font-bold text-gray-400 uppercase tracking-wider select-none">
-                                        <th className="px-6 py-4">Member</th>
-                                        <th className="px-6 py-4">Date</th>
-                                        <th className="px-6 py-4">Amount</th>
-                                        <th className="px-6 py-4">Pocket</th>
-                                        <th className="px-6 py-4 text-right">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {(!data.pendingVerifications || data.pendingVerifications.length === 0) ? (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-10 text-center text-xs text-gray-400 font-medium">
-                                                Semua iuran terverifikasi! Tidak ada verifikasi tertunda.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        data.pendingVerifications.map((item) => (
-                                            <tr key={item.id} className="hover:bg-gray-50/30 transition-all duration-200">
-                                                {/* Kolom Member */}
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        {item.member.avatarUrl ? (
-                                                            <img
-                                                                src={item.member.avatarUrl}
-                                                                alt={item.member.name}
-                                                                className="w-8 h-8 rounded-full object-cover shadow-inner flex-shrink-0"
-                                                            />
-                                                        ) : (
-                                                            <div className={`w-8 h-8 rounded-full ${item.member.color || 'bg-slate-800'} text-white font-bold text-[11px] flex items-center justify-center flex-shrink-0 shadow-inner select-none`}>
-                                                                {item.member.avatar}
-                                                            </div>
-                                                        )}
-                                                        <span className="text-xs font-bold text-slate-800">{item.member.name}</span>
-                                                    </div>
-                                                </td>
-                                                {/* Kolom Date */}
-                                                <td className="px-6 py-4 text-xs font-medium text-gray-400">
-                                                    {item.date}
-                                                </td>
-                                                {/* Kolom Amount */}
-                                                <td className="px-6 py-4 text-xs font-extrabold text-slate-800">
-                                                    {idr(item.amount)}
-                                                </td>
-                                                {/* Kolom Pocket */}
-                                                <td className="px-6 py-4">
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                                        item.pocket === 'Arisan Bulanan'
-                                                            ? 'bg-orange-50 text-primary'
-                                                            : 'bg-[#E0F2FE]/50 text-[#0284C7]'
-                                                    }`}>
-                                                        {item.pocket}
-                                                    </span>
-                                                </td>
-                                                {/* Kolom Aksi */}
-                                                <td className="px-6 py-4 text-right">
-                                                    <button
-                                                        onClick={() => handleVerify(item.id)}
-                                                        disabled={verifyingId === item.id}
-                                                        className="px-4 py-1.5 border border-[#0284C7]/20 rounded-lg text-xs font-semibold text-[#0284C7] hover:bg-sky-50/50 hover:border-[#0284C7]/50 transition duration-150 bg-white cursor-pointer select-none disabled:opacity-60"
-                                                    >
-                                                        {verifyingId === item.id ? '...' : 'Verify'}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
+                    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden flex flex-col h-full">
+                        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Aktivitas Terkini</h2>
+                            <Link href="/ledger" className="text-[10px] font-bold text-primary hover:underline">Lihat Buku Besar</Link>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2">
+                            {data.recentTransactions.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                                        <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                                    </div>
+                                    <h3 className="text-sm font-bold text-slate-800 mb-1">Belum Ada Transaksi</h3>
+                                    <p className="text-xs text-slate-500 max-w-[200px] mb-5">Komunitas ini belum memiliki aktivitas keuangan apapun.</p>
+                                    {isAdmin && (
+                                        <Link href="/pockets" className="text-xs font-bold bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:bg-primary/90 transition shadow-sm">
+                                            Buat Kas Pertama
+                                        </Link>
                                     )}
-                                </tbody>
-                            </table>
+                                </div>
+                            ) : (
+                                <div className="space-y-1">
+                                    {data.recentTransactions.slice(0, 5).map(t => (
+                                        <div key={t.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl transition">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${t.direction === 'in' ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
+                                                {t.direction === 'in' ? (
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                                                ) : (
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-slate-800 truncate">{t.note || (t.direction === 'in' ? 'Pemasukan' : 'Pengeluaran')}</p>
+                                                <p className="text-[10px] text-slate-500 truncate">{t.member?.name || 'Sistem'} • {new Date(t.createdAt).toLocaleDateString('id-ID')}</p>
+                                            </div>
+                                            <div className={`text-xs font-extrabold flex-shrink-0 ${t.direction === 'in' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                {t.direction === 'in' ? '+' : '-'}{idr(t.amount)}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
-            )}
+
+                {/* SIDEBAR: POCKET DISTRIBUTION */}
+                <div className="space-y-6">
+                    <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Distribusi Kas</h2>
+                            <Link href="/pockets" className="text-[10px] font-bold text-primary hover:underline">Kelola</Link>
+                        </div>
+                        <div className="space-y-4">
+                            {data.pockets.length === 0 ? (
+                                <p className="text-xs text-slate-400 text-center py-4">Belum ada kas</p>
+                            ) : (
+                                data.pockets.map(p => {
+                                    const total = Number(data.totalBalance);
+                                    const bal = Number(p.balance);
+                                    const percent = total > 0 ? Math.round((bal / total) * 100) : 0;
+                                    return (
+                                        <div key={p.id} className="space-y-1.5">
+                                            <div className="flex justify-between text-xs font-semibold">
+                                                <span className="text-slate-700 truncate">{p.name}</span>
+                                                <span className="text-slate-800">{idr(bal)}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                                    <div className="bg-primary h-full rounded-full" style={{ width: `${percent}%` }}></div>
+                                                </div>
+                                                <span className="text-[9px] font-bold text-slate-400 w-6 text-right">{percent}%</span>
+                                            </div>
+                                        </div>
+                                    )
+                                })
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Quick Shortcuts */}
+                    <div className="bg-slate-800 rounded-2xl border border-slate-700 p-5 shadow-sm text-white">
+                        <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-4">Akses Cepat</h2>
+                        <div className="grid grid-cols-2 gap-3">
+                            <Link href="/wallet" className="bg-slate-700/50 hover:bg-slate-700 p-3 rounded-xl transition flex flex-col items-center justify-center gap-2 text-center group">
+                                <svg className="w-5 h-5 text-sky-400 group-hover:scale-110 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                                <span className="text-[10px] font-bold">Dompetku</span>
+                            </Link>
+                            {isAdmin && (
+                                <Link href="/members" className="bg-slate-700/50 hover:bg-slate-700 p-3 rounded-xl transition flex flex-col items-center justify-center gap-2 text-center group">
+                                    <svg className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                                    <span className="text-[10px] font-bold">Kelola Warga</span>
+                                </Link>
+                            )}
+                            <Link href="/events" className="bg-slate-700/50 hover:bg-slate-700 p-3 rounded-xl transition flex flex-col items-center justify-center gap-2 text-center group">
+                                <svg className="w-5 h-5 text-rose-400 group-hover:scale-110 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                <span className="text-[10px] font-bold">Agenda</span>
+                            </Link>
+                            {isAdmin && (
+                                <Link href="/settings" className="bg-slate-700/50 hover:bg-slate-700 p-3 rounded-xl transition flex flex-col items-center justify-center gap-2 text-center group">
+                                    <svg className="w-5 h-5 text-amber-400 group-hover:scale-110 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <span className="text-[10px] font-bold">Pengaturan</span>
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
-
-

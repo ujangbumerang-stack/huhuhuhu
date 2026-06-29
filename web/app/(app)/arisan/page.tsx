@@ -182,8 +182,9 @@ export default function ArisanPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-[50vh] text-gray-400 text-sm">
-                Memuat data arisan...
+            <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
+                <div className="w-10 h-10 border-4 border-slate-200 rounded-full animate-spin" style={{ borderTopColor: 'var(--community-primary, #0B1E26)' }} />
+                <span className="text-sm font-bold text-slate-400 animate-pulse tracking-wide">Memuat data arisan...</span>
             </div>
         );
     }

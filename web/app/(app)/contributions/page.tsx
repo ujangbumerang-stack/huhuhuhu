@@ -196,7 +196,10 @@ export default function ContributionsPage() {
                 </div>
                 <div className="divide-y divide-gray-50">
                     {loading ? (
-                        <div className="px-6 py-8 text-center text-xs text-gray-400">Memuat tagihan...</div>
+                        <div className="px-6 py-12 flex flex-col items-center justify-center gap-3">
+                            <div className="w-8 h-8 border-4 border-slate-100 rounded-full animate-spin" style={{ borderTopColor: 'var(--community-primary, #0B1E26)' }} />
+                            <span className="text-xs font-bold text-slate-400 animate-pulse">Memuat tagihan...</span>
+                        </div>
                     ) : myContributions.length === 0 ? (
                         <div className="px-6 py-8 text-center text-xs text-gray-400">Tidak ada tagihan untuk Anda saat ini.</div>
                     ) : myContributions.slice(myPage * PAGE_SIZE, (myPage + 1) * PAGE_SIZE).map(c => (

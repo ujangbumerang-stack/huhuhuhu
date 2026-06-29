@@ -231,7 +231,10 @@ export default function ForumPage() {
 
                     <div className="space-y-3">
                         {loadingComments ? (
-                            <div className="py-8 text-center text-xs text-gray-400">Memuat komentar...</div>
+                            <div className="py-8 flex flex-col items-center justify-center gap-2">
+                                <div className="w-6 h-6 border-3 border-slate-100 rounded-full animate-spin" style={{ borderTopColor: 'var(--community-primary, #0B1E26)' }} />
+                                <span className="text-xs font-bold text-slate-400 animate-pulse">Memuat komentar...</span>
+                            </div>
                         ) : comments.length === 0 ? (
                             <div className="py-8 text-center bg-slate-50 border border-dashed border-gray-200 rounded-2xl text-slate-400 text-xs font-medium">
                                 Belum ada komentar. Jadilah yang pertama memberikan tanggapan!
@@ -283,7 +286,12 @@ export default function ForumPage() {
             </div>
 
             <div className="space-y-4 pt-2">
-                {loading && <div className="py-8 text-center text-xs text-gray-400 animate-pulse">Memuat diskusi...</div>}
+                {loading && (
+                    <div className="py-12 flex flex-col items-center justify-center gap-3">
+                        <div className="w-8 h-8 border-4 border-slate-100 rounded-full animate-spin" style={{ borderTopColor: 'var(--community-primary, #0B1E26)' }} />
+                        <span className="text-xs font-bold text-slate-400 animate-pulse">Memuat diskusi...</span>
+                    </div>
+                )}
 
                 {!loading && threads.length === 0 && (
                     <div className="py-16 text-center space-y-2">
