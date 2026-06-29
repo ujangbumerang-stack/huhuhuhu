@@ -4,6 +4,7 @@ import { useEffect, useState, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { idr } from '@/lib/format';
+import { getMe } from '@/lib/auth';
 import { CommunityContext } from '../layout';
 
 export default function ArisanPage() {
@@ -13,6 +14,7 @@ export default function ArisanPage() {
     const [periods, setPeriods] = useState<any[]>([]);
     const [setoran, setSetoran] = useState<any[]>([]);
     const [communityMembers, setCommunityMembers] = useState<any[]>([]);
+    const [currentUser, setCurrentUser] = useState<any>(null);
 
     const [showPayoutModal, setShowPayoutModal] = useState(false);
     const [showManageModal, setShowManageModal] = useState(false);
@@ -35,6 +37,9 @@ export default function ArisanPage() {
     const loadData = async (silent = false) => {
         if (!silent) setLoading(true);
         try {
+            const user = await getMe();
+            setCurrentUser(user);
+
             const activeSlug = localStorage.getItem('kyklos_active_community_slug') || 'keluarga-cemara';
             const list = await api.get<any[]>('/communities');
             const c = list.find(x => x.slug === activeSlug) || list[0];
@@ -44,16 +49,25 @@ export default function ArisanPage() {
             const arisan = pockets.find(p => p.type?.toUpperCase() === 'ARISAN');
             if (arisan) {
                 setArisanPocket(arisan);
-                const [parts, per, stor, mems] = await Promise.all([
+                const [parts, per, contribs, mems] = await Promise.all([
                     api.get<any[]>(`/pockets/${arisan.id}/arisan/participants`),
                     api.get<any[]>(`/pockets/${arisan.id}/arisan/periods`),
-                    api.get<any[]>(`/pockets/${arisan.id}/arisan/setoran`),
+                    api.get<any[]>(`/communities/${c.id}/contributions`),
                     api.get<any[]>(`/communities/${c.id}/members`),
                 ]);
                 setParticipants(parts || []);
                 setPeriods(per || []);
-                setSetoran(stor || []);
                 setCommunityMembers(mems || []);
+
+                const allPocketContribs = (contribs || []).filter((c: any) => c.schedule?.pocketId === arisan.id);
+                // Kita hanya peduli pada setoran untuk jadwal tagihan TERBARU (putaran saat ini)
+                const latestScheduleId = allPocketContribs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]?.schedule?.id;
+                
+                const currentRoundContribs = latestScheduleId 
+                    ? allPocketContribs.filter((c: any) => c.schedule?.id === latestScheduleId) 
+                    : [];
+                
+                setSetoran(currentRoundContribs);
             }
         } catch (err) {
             console.error('Failed to load arisan data', err);
@@ -113,13 +127,9 @@ export default function ArisanPage() {
     };
 
     const handleTagihSemua = () => {
-        const belumSetor = participants.filter(p => !setoran.some(s => s.participantId === p.id));
-        if (belumSetor.length === 0) {
-            setSuccessMessage('Semua peserta sudah setor putaran ini! 🎉');
-        } else {
-            setSuccessMessage(`Pengingat setoran dikirim ke ${belumSetor.length} peserta yang belum setor.`);
-        }
-        setTimeout(() => setSuccessMessage(null), 5000);
+        const title = encodeURIComponent(`Arisan Putaran ${putaranKe}`);
+        const amount = arisanPocket.contributionAmount || 0;
+        router.push(`/contributions?new=true&title=${title}&amount=${amount}&pocketId=${arisanPocket.id}`);
     };
 
     const handleRemoveParticipant = async (participantId: string) => {
@@ -154,22 +164,7 @@ export default function ArisanPage() {
     };
 
     const openSetoranTab = (p: any) => {
-        const amount = arisanPocket.contributionAmount || 100000;
-        const params = new URLSearchParams({
-            type: 'arisan',
-            id: arisanPocket.id,
-            pocketId: arisanPocket.id,
-            amount: String(amount),
-            title: encodeURIComponent(arisanPocket.name),
-            participantId: p.id,
-            memberId: p.memberId,
-            memberName: encodeURIComponent(p.member?.name || ''),
-            contributionAmount: String(amount),
-            bank: 'BCA',
-            account: '9876543210',
-            holder: encodeURIComponent(arisanPocket.name),
-        });
-        window.open(`/pay?${params.toString()}`, '_blank', 'width=480,height=700,noopener');
+        router.push('/contributions');
     };
 
     useEffect(() => {
@@ -202,13 +197,13 @@ export default function ArisanPage() {
         );
     }
 
-    const selesaiCount = periods.filter(p => p.status === 'done').length;
+    const selesaiCount = periods.filter(p => p.status === 'drawn').length;
     const putaranKe = selesaiCount + 1;
     const targetPool = arisanPocket.targetAmount || (participants.length * (arisanPocket.contributionAmount || 100000));
     const totalTerkumpul = Number(arisanPocket.balance) || 0;
     const progressPercent = targetPool > 0 ? Math.min(100, Math.round((totalTerkumpul / targetPool) * 100)) : 0;
-    const latestWinner = periods.filter(p => p.status === 'done').pop();
-    const pemenangIds = periods.filter(p => p.status === 'done').map(p => p.winner?.name);
+    const latestWinner = periods.filter(p => p.status === 'drawn').pop();
+    const pemenangIds = periods.filter(p => p.status === 'drawn').map(p => p.recipient?.name);
     const berikutnya = participants.find(p => !pemenangIds.includes(p.member?.name));
 
     return (
@@ -277,7 +272,7 @@ export default function ArisanPage() {
                         </div>
                         <div className="flex justify-between text-[11px] font-bold text-gray-400">
                             <span>{progressPercent}% terkumpul</span>
-                            <span>{setoran.length}/{participants.length} sudah setor</span>
+                            <span>{setoran.filter(s => s.status === 'paid' || s.status === 'verified').length}/{participants.length} sudah setor</span>
                         </div>
                     </div>
 
@@ -360,13 +355,14 @@ export default function ArisanPage() {
             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/20">
                     <h3 className="font-serif text-base font-bold text-slate-800">Status Setoran Putaran Ini</h3>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{setoran.length} dari {participants.length} peserta sudah menyetor</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{setoran.filter(s => s.status === 'paid' || s.status === 'verified').length} dari {participants.length} peserta sudah lunas</p>
                 </div>
                 <div className="divide-y divide-gray-50">
                     {participants.length === 0 ? (
                         <div className="px-6 py-10 text-center text-xs text-gray-400">Belum ada peserta arisan.</div>
                     ) : participants.map(p => {
-                        const sudahSetor = setoran.some(s => s.participantId === p.id);
+                        const sudahSetor = setoran.some(s => s.memberId === p.memberId && (s.status === 'paid' || s.status === 'verified'));
+                        const adaTagihan = setoran.some(s => s.memberId === p.memberId);
                         const idx = periods.filter(per => per.status === 'done').findIndex(per => per.winner?.name === p.member?.name);
                         const sudahMenang = idx !== -1;
                         return (
@@ -381,17 +377,16 @@ export default function ArisanPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${
-                                        sudahSetor ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
-                                    }`}>
-                                        {sudahSetor ? 'SUDAH SETOR' : 'BELUM SETOR'}
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${sudahSetor ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
+                                        }`}>
+                                        {sudahSetor ? 'LUNAS' : 'BELUM LUNAS'}
                                     </span>
-                                    {!sudahSetor && (
+                                    {!sudahSetor && adaTagihan && !isAdmin && currentUser?.id === p.memberId && (
                                         <button
                                             onClick={() => openSetoranTab(p)}
                                             className="px-3 py-1.5 bg-primary text-white rounded-lg text-[10px] font-bold hover:brightness-90 transition cursor-pointer"
                                         >
-                                            Setor →
+                                            Lihat Tagihan →
                                         </button>
                                     )}
                                 </div>
@@ -417,19 +412,19 @@ export default function ArisanPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {periods.filter(p => p.status === 'done').map((p, i) => (
+                                {periods.filter(p => p.status === 'drawn').map((p, i) => (
                                     <tr key={p.id} className="hover:bg-gray-50/30">
                                         <td className="px-6 py-3.5 text-xs font-bold text-slate-800">Putaran {i + 1}</td>
                                         <td className="px-6 py-3.5">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 font-black text-[9px] flex items-center justify-center">
-                                                    {p.winner?.name?.[0]}
+                                                    {p.recipient?.name?.[0]}
                                                 </div>
-                                                <span className="text-xs font-bold text-slate-800">{p.winner?.name}</span>
+                                                <span className="text-xs font-bold text-slate-800">{p.recipient?.name}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-3.5 text-xs text-gray-400 text-right">
-                                            {new Date(p.endDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                            {new Date(p.periodDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                                         </td>
                                     </tr>
                                 ))}

@@ -100,7 +100,7 @@ export class WalletService {
     const pocketId = contribution.schedule?.pocketId;
     if (!pocketId) throw new BadRequestException('Iuran tidak terhubung ke kas');
 
-    // Atomic: debit balance + buat transaksi + mark paid
+    // Atomic: debit balance + buat transaksi + mark paid + increment pocket balance
     const [, , txn] = await this.prisma.$transaction([
       this.prisma.userBalance.update({
         where: { userId },
@@ -122,6 +122,10 @@ export class WalletService {
           status: 'confirmed',
         },
       }),
+      this.prisma.pocket.update({
+        where: { id: pocketId },
+        data: { balance: { increment: contribution.amount } },
+      })
     ]);
 
     // Link transaction ke contribution

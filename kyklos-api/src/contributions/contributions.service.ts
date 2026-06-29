@@ -32,7 +32,7 @@ export class ContributionsService {
       where: { communityId },
       include: {
         member: { select: { id: true, name: true, email: true, avatarUrl: true } },
-        schedule: { select: { title: true } },
+        schedule: { select: { title: true, pocketId: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -111,24 +111,34 @@ export class ContributionsService {
     const pocketId = c.schedule?.pocketId;
     if (!pocketId) throw new BadRequestException('No pocket linked');
 
-    const txn = await this.prisma.transaction.create({
-      data: {
-        communityId: c.communityId,
-        pocketId,
-        memberId: c.memberId,
-        amount: c.amount,
-        direction: 'in',
-        category: 'dues',
-        note: 'Contribution verified',
-        status: 'confirmed',
-        createdById: adminId,
-      },
-    });
+    const [txn] = await this.prisma.$transaction([
+      this.prisma.transaction.create({
+        data: {
+          communityId: c.communityId,
+          pocketId,
+          memberId: c.memberId,
+          amount: c.amount,
+          direction: 'in',
+          category: 'dues',
+          note: 'Contribution verified',
+          status: 'confirmed',
+          createdById: adminId,
+        },
+      }),
+      this.prisma.pocket.update({
+        where: { id: pocketId },
+        data: { balance: { increment: c.amount } }
+      }),
+      this.prisma.contribution.update({
+        where: { id },
+        data: { status: 'paid', paidAt: new Date() },
+      })
+    ]);
 
     this.logger.log(`Payment verified: contribution=${id} → transaction=${txn.id} pocket=${pocketId}`);
     return this.prisma.contribution.update({
       where: { id },
-      data: { status: 'paid', paidAt: new Date(), transactionId: txn.id },
+      data: { transactionId: txn.id }
     });
   }
 
@@ -141,23 +151,33 @@ export class ContributionsService {
     const pocketId = c.schedule?.pocketId;
     if (!pocketId) throw new BadRequestException('No pocket linked to this dues schedule');
 
-    // Create incoming transaction
-    const txn = await this.prisma.transaction.create({
-      data: {
-        communityId: c.communityId,
-        pocketId,
-        memberId: c.memberId,
-        amount: c.amount,
-        direction: 'in',
-        category: 'dues',
-        note: 'Pembayaran tagihan via Simulator',
-        status: 'confirmed',
-      },
-    });
+    // Create incoming transaction and increment pocket balance
+    const [txn] = await this.prisma.$transaction([
+      this.prisma.transaction.create({
+        data: {
+          communityId: c.communityId,
+          pocketId,
+          memberId: c.memberId,
+          amount: c.amount,
+          direction: 'in',
+          category: 'dues',
+          note: 'Pembayaran tagihan via Simulator',
+          status: 'confirmed',
+        },
+      }),
+      this.prisma.pocket.update({
+        where: { id: pocketId },
+        data: { balance: { increment: c.amount } }
+      }),
+      this.prisma.contribution.update({
+        where: { id },
+        data: { status: 'paid', paidAt: new Date() },
+      })
+    ]);
 
     return this.prisma.contribution.update({
       where: { id },
-      data: { status: 'paid', paidAt: new Date(), transactionId: txn.id },
+      data: { transactionId: txn.id },
     });
   }
 }

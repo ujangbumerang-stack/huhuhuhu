@@ -43,6 +43,22 @@ function PayContent() {
                     participantId, memberId, memberName,
                     amount: contributionAmount,
                 });
+            } else if (type === 'pocket') {
+                const note = params.get('note') || 'Deposit Kas';
+                await api.post(`/pockets/${pocketId}/transactions`, {
+                    amount: amount,
+                    type: 'in',
+                    description: note
+                });
+            } else if (type === 'withdraw') {
+                const note = params.get('note') || 'Pencairan dana';
+                await api.post(`/pockets/${pocketId}/withdraw`, {
+                    amount: amount,
+                    note: note,
+                    bankName: bankName,
+                    accountNumber: accountNumber,
+                    accountHolder: accountHolder
+                });
             } else {
                 await api.post(`/contributions/${id}/simulate-pay`, {});
             }
@@ -85,7 +101,7 @@ function PayContent() {
                     <div className="p-6 space-y-5">
                         <div className="space-y-1">
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                {type === 'arisan' ? 'Setoran Arisan' : 'Pembayaran Tagihan'}
+                                {type === 'arisan' ? 'Setoran Arisan' : type === 'pocket' ? 'Deposit Kantong Kas' : type === 'withdraw' ? 'Pencairan Dana Kantong' : 'Pembayaran Tagihan'}
                             </p>
                             <p className="font-serif text-xl font-black text-slate-800">{decodeURIComponent(title)}</p>
                             {memberName && (
@@ -95,7 +111,7 @@ function PayContent() {
 
                         {/* Nominal */}
                         <div className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 flex items-center justify-between">
-                            <span className="text-xs text-gray-500 font-bold">Total Pembayaran</span>
+                            <span className="text-xs text-gray-500 font-bold">Total {type === 'withdraw' ? 'Penarikan' : 'Pembayaran'}</span>
                             <span className="font-serif text-2xl font-black text-[#0B1E26]">{idr(amount)}</span>
                         </div>
 
@@ -136,7 +152,7 @@ function PayContent() {
                             onClick={handlePay}
                             className="w-full py-3.5 bg-[#0B1E26] text-white rounded-2xl font-black text-sm hover:brightness-110 transition cursor-pointer"
                         >
-                            Konfirmasi Sudah Transfer →
+                            {type === 'withdraw' ? 'Konfirmasi Pencairan Dana →' : 'Konfirmasi Sudah Transfer →'}
                         </button>
                         <button
                             onClick={() => window.close()}
@@ -190,11 +206,11 @@ function PayContent() {
                             </svg>
                         </div>
                         <div className="space-y-1.5">
-                            <p className="font-serif text-2xl font-black text-slate-800">Pembayaran Berhasil!</p>
-                            <p className="text-sm text-gray-500">{idr(amount)} telah masuk ke kantong komunitas</p>
+                            <p className="font-serif text-2xl font-black text-slate-800">{type === 'withdraw' ? 'Pencairan Berhasil!' : 'Pembayaran Berhasil!'}</p>
+                            <p className="text-sm text-gray-500">{idr(amount)} {type === 'withdraw' ? 'telah dicairkan dari kantong komunitas' : 'telah masuk ke kantong komunitas'}</p>
                         </div>
                         <span className="text-[10px] font-bold px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 uppercase tracking-wider">
-                            Status: Lunas
+                            Status: {type === 'withdraw' ? 'Transferred' : 'Lunas'}
                         </span>
                         <p className="text-[10px] text-gray-300">Tab ini akan tertutup otomatis...</p>
                     </div>

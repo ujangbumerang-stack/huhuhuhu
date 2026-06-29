@@ -66,23 +66,8 @@ export class ArisanService {
     const lastPeriod = await this.prisma.arisanPeriod.findFirst({ where: { pocketId }, orderBy: { roundNo: 'desc' } });
     const nextRound = (lastPeriod?.roundNo ?? 0) + 1;
 
-    const winnerUser = await this.prisma.user.findUnique({ where: { id: winner.memberId } });
-    
-    if (pocket.balance > BigInt(0)) {
-      await this.prisma.withdrawalRequest.create({
-        data: {
-          communityId,
-          pocketId,
-          userId: winner.memberId,
-          amount: pocket.balance,
-          status: 'pending',
-          bankName: 'Uang Tunai / Bebas',
-          accountNumber: '-',
-          accountHolder: winnerUser?.name || 'Pemenang',
-          note: `Pemenang Arisan: ${winnerUser?.name || 'Pemenang'} (Otomatis dibuat oleh sistem)`
-        }
-      });
-    }
+    // Pemenang diundi. Saldo tetap di kantong (status pending).
+    // Admin harus mencairkan (Tarik Dana) secara manual.
 
     const period = await this.prisma.arisanPeriod.create({
       data: { pocketId, communityId, roundNo: nextRound, recipientMemberId: winner.memberId, status: 'drawn', periodDate: new Date() },

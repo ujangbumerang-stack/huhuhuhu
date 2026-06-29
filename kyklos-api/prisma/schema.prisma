@@ -156,6 +156,7 @@ model Pocket {
   balance            BigInt              @default(0)
   vaNumber           String?             @map("va_number")
   vaName             String?             @map("va_name")
+  contributionAmount Int?                @map("contribution_amount")
   createdAt          DateTime            @default(now()) @map("created_at")
   arisanParticipants ArisanParticipant[]
   arisanPeriods      ArisanPeriod[]

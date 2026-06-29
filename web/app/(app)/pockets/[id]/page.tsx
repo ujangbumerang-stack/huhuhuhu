@@ -109,9 +109,17 @@ export default function PocketDetailPage() {
         }
     }, [pocketId]);
 
+    useEffect(() => {
+        const onStorage = (e: StorageEvent) => {
+            if (e.key === 'kyklos_payment_done') loadData();
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, []);
+
     const handleTransactionSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (submittingTx) return;
+        if (submittingTx || !pocket) return;
 
         const amountNum = parseFloat(txForm.amount) || 0;
         if (amountNum <= 0) {
@@ -121,24 +129,45 @@ export default function PocketDetailPage() {
 
         setSubmittingTx(true);
         try {
-            if (activeTab === 'disburse') {
+            if (activeTab === 'deposit') {
+                const payParams = new URLSearchParams({
+                    type: 'pocket',
+                    pocketId: pocket.id,
+                    amount: String(amountNum),
+                    title: encodeURIComponent('Deposit ' + pocket.name),
+                    note: txForm.notes || 'Deposit Kas',
+                    bank: 'NOBU',
+                    account: getPocketVA(pocket),
+                    holder: encodeURIComponent(getPocketVAName(communityName, pocket.name, pocket)),
+                });
+                window.open(`/pay?${payParams.toString()}`, '_blank', 'width=480,height=700,noopener');
+                setSubmittingTx(false);
+                setTxForm({ amount: '', notes: '' });
+                return;
+            } else if (activeTab === 'disburse') {
                 if (!paymentConfig || !paymentConfig.bankName || !paymentConfig.accountNumber) {
                     alert('Harap atur rekening bank komunitas terlebih dahulu di pengaturan.');
                     setSubmittingTx(false);
                     return;
                 }
-                await api.post(`/pockets/${pocketId}/withdraw`, {
-                    amount: amountNum,
+                const payParams = new URLSearchParams({
+                    type: 'withdraw',
+                    pocketId: pocket.id,
+                    amount: String(amountNum),
+                    title: encodeURIComponent('Pencairan ' + pocket.name),
                     note: txForm.notes || 'Pencairan dana',
-                    bankName: paymentConfig.bankName,
-                    accountNumber: paymentConfig.accountNumber,
-                    accountHolder: paymentConfig.accountHolder || 'Penerima'
+                    bank: paymentConfig.bankName,
+                    account: paymentConfig.accountNumber,
+                    holder: encodeURIComponent(paymentConfig.accountHolder || 'Penerima'),
                 });
-                alert('Permintaan penarikan telah diajukan dan berhasil diproses.');
+                window.open(`/pay?${payParams.toString()}`, '_blank', 'width=480,height=700,noopener');
+                setSubmittingTx(false);
+                setTxForm({ amount: '', notes: '' });
+                return;
             } else {
                 await api.post(`/pockets/${pocketId}/transactions`, {
                     amount: amountNum,
-                    type: activeTab === 'deposit' ? 'in' : 'out',
+                    type: 'out',
                     description: txForm.notes || 'Transaksi'
                 });
             }

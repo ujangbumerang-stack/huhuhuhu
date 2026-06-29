@@ -80,6 +80,21 @@ export default function ContributionsPage() {
         loadData();
     }, []);
 
+    useEffect(() => {
+        const search = new URLSearchParams(window.location.search);
+        if (search.get('new') === 'true') {
+            setShowNewDueModal(true);
+            setNewDueForm(prev => ({
+                ...prev,
+                title: search.get('title') || '',
+                amount: search.get('amount') || '',
+                pocketId: search.get('pocketId') || prev.pocketId,
+                frequency: 'one-time',
+            }));
+            window.history.replaceState({}, '', '/contributions');
+        }
+    }, []);
+
     const handleCreateDue = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newDueForm.pocketId) {
@@ -87,16 +102,23 @@ export default function ContributionsPage() {
             return;
         }
         try {
-            await api.post(`/communities/${communityId}/dues`, {
+            const newDue = await api.post<any>(`/communities/${communityId}/dues`, {
                 title: newDueForm.title,
                 amount: parseFloat(newDueForm.amount),
                 pocketId: newDueForm.pocketId,
                 dueDate: newDueForm.dueDate || new Date().toISOString(),
                 period: newDueForm.frequency,
             });
+            
+            // Otomatis generate invoice untuk semua member!
+            if (newDue?.id) {
+                await api.post(`/dues/${newDue.id}/generate`, {});
+            }
+
             setShowNewDueModal(false);
             setNewDueForm({ title: '', amount: '', dueDate: '', frequency: 'monthly', isMandatory: true, pocketId: pockets[0]?.id || '' });
             loadData();
+            alert('Tagihan berhasil dibuat dan invoice telah dikirim ke semua anggota!');
         } catch (err: any) {
             alert(err.message || 'Gagal membuat tagihan iuran');
         }

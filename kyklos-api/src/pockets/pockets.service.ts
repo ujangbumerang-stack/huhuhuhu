@@ -194,7 +194,7 @@ export class PocketsService {
     return { message: 'Withdrawal approved', transactionId: txn.id };
   }
 
-  async update(id: string, data: { name?: string; description?: string; vaNumber?: string; vaName?: string }) {
+  async update(id: string, data: { name?: string; description?: string; vaNumber?: string; vaName?: string; contributionAmount?: number }) {
     const pocket = await this.findOne(id);
     this.logger.log(`Updating pocket ${id}: ${JSON.stringify(data)}`);
     return this.prisma.pocket.update({
